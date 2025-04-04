@@ -1,132 +1,186 @@
 package xin.vanilla.narcissus;
 
-import com.mojang.brigadier.CommandDispatcher;
 import lombok.Getter;
-import net.minecraft.commands.CommandSourceStack;
+import me.shedaniel.autoconfig.AutoConfig;
+import me.shedaniel.autoconfig.serializer.JanksonConfigSerializer;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xin.vanilla.narcissus.command.FarewellCommand;
+import xin.vanilla.narcissus.config.ConfigManager;
 import xin.vanilla.narcissus.config.ServerConfig;
 import xin.vanilla.narcissus.config.TeleportRequest;
-import xin.vanilla.narcissus.event.ClientEventHandler;
+import xin.vanilla.narcissus.event.ServerEventHandler;
 import xin.vanilla.narcissus.network.ModNetworkHandler;
 import xin.vanilla.narcissus.network.SplitPacket;
-import xin.vanilla.narcissus.util.LogoModifier;
+import xin.vanilla.narcissus.util.NarcissusUtils;
 
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
-@Mod(NarcissusFarewell.MODID)
-public class NarcissusFarewell {
-
-    public final static String DEFAULT_COMMAND_PREFIX = "narcissus";
-
-    public static final String MODID = "narcissus_farewell";
-
+/**
+ * NarcissusFarewell 主类
+ */
+public class NarcissusFarewell implements ModInitializer {
     private static final Logger LOGGER = LogManager.getLogger();
 
+    public static final String MOD_ID = "narcissus_farewell";
+    public static final String DEFAULT_COMMAND_PREFIX = "farewell";
+    public static final String DEFAULT_LANGUAGE = "en_us";
+
     /**
-     * 服务端实例
+     * -- GETTER --
+     *  获取服务器实例
+     *
      */
+    // 服务器实例
     @Getter
     private static MinecraftServer serverInstance;
 
     /**
-     * 默认语言
-     */
-    public static final String DEFAULT_LANGUAGE = "en_us";
-
-    /**
-     * 分片网络包缓存
-     */
-    @Getter
-    private static final Map<String, List<? extends SplitPacket>> packetCache = new ConcurrentHashMap<>();
-
-    /**
-     * 玩家能力同步状态
-     */
-    @Getter
-    private static final Map<String, Boolean> playerCapabilityStatus = new ConcurrentHashMap<>();
-
-    /**
-     * 最近一次传送请求
-     */
-    @Getter
-    private static final Map<ServerPlayer, ServerPlayer> lastTeleportRequest = new ConcurrentHashMap<>();
-
-    /**
-     * 待处理的传送请求列表
-     */
-    @Getter
-    private static final Map<String, TeleportRequest> teleportRequest = new ConcurrentHashMap<>();
-
-    public NarcissusFarewell() {
-
-        // 注册网络通道
-        ModNetworkHandler.registerPackets();
-        // 注册服务器启动和关闭事件
-        MinecraftForge.EVENT_BUS.addListener(this::onServerStarting);
-
-        // 注册服务端配置
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, ServerConfig.SERVER_CONFIG);
-
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            FMLJavaModLoadingContext.get().getModEventBus().addListener(ClientEventHandler::registerKeyMappings);
-            FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
-        }
-
-        // 注册当前实例到MinecraftForge的事件总线，以便监听和处理游戏内的各种事件
-        MinecraftForge.EVENT_BUS.register(this);
-    }
-
-    /**
-     * 在客户端设置阶段触发的事件处理方法
-     * 此方法主要用于接收 FML 客户端设置事件，并执行相应的初始化操作
-     */
-    @SubscribeEvent
-    public void onClientSetup(final FMLClientSetupEvent event) {
-        // 修改logo为随机logo
-        ModList.get().getMods().stream()
-                .filter(info -> info.getModId().equals(MODID))
-                .findFirst()
-                .ifPresent(LogoModifier::modifyLogo);
-    }
-
-    // 服务器启动时加载数据
-    private void onServerStarting(ServerStartingEvent event) {
-        serverInstance = event.getServer();
-        // 注册传送命令到事件调度器
-        LOGGER.debug("Registering commands");
-        FarewellCommand.register(commandDispatcher);
-    }
-
-    private static CommandDispatcher<CommandSourceStack> commandDispatcher;
-
-    /**
-     * 注册命令事件的处理方法
-     * 当注册命令事件被触发时，此方法将被调用
-     * 该方法主要用于注册传送命令到事件调度器
+     * -- GETTER --
+     *  获取玩家能力组件同步状态
      *
-     * @param event 注册命令事件对象，通过该对象可以获取到事件调度器
      */
-    @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
-        commandDispatcher = event.getDispatcher();
+    // 玩家能力组件同步状态
+    @Getter
+    private static final Map<String, Boolean> playerCapabilityStatus = new HashMap<>();
+
+    /**
+     * -- GETTER --
+     *  获取传送请求
+     *
+     */
+    // 传送请求 - 修改为使用String作为键
+    @Getter
+    private static final Map<String, TeleportRequest> teleportRequest = new HashMap<>();
+
+    /**
+     * -- GETTER --
+     *  获取最近的传送请求
+     *
+     */
+    // 最近的传送请求
+    @Getter
+    private static final Map<ServerPlayer, ServerPlayer> lastTeleportRequest = new HashMap<>();
+
+    /**
+     * -- GETTER --
+     *  获取数据包缓存
+     *
+     */
+    // 添加到类的字段部分
+    @Getter
+    private static final Map<String, Map<Integer, SplitPacket>> packetCache = new HashMap<>();
+
+    // 添加玩家语言映射
+    @Getter
+    private static final Map<String, String> playerLanguages = new HashMap<>();
+
+
+    @Override
+    public void onInitialize() {
+        LOGGER.info("Initializing NarcissusFarewell...");
+
+        // 注册配置
+        registerConfig();
+
+        // 注册服务器生命周期事件
+        registerServerLifecycleEvents();
+
+        // 注册服务器事件
+        ServerEventHandler.registerEvents();
+
+        // 注册命令
+        registerCommands();
+
+        // 注册网络包处理器
+        registerNetworkHandlers();
+
+        LOGGER.info("NarcissusFarewell initialized successfully!");
     }
 
+    /**
+     * 注册配置
+     */
+    private void registerConfig() {
+        AutoConfig.register(ServerConfig.class, JanksonConfigSerializer::new);
+        ConfigManager.init();
+    }
+
+    private void registerServerLifecycleEvents() {
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            serverInstance = server;
+            LOGGER.info("Server starting, instance saved.");
+        });
+
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            serverInstance = null;
+            LOGGER.info("Server stopping, instance cleared.");
+
+            // 清理所有缓存的数据
+            NarcissusUtils.clearCache();
+            if (FarewellCommand.helpMessage != null) {
+                FarewellCommand.helpMessage = null;
+            }
+        });
+    }
+
+
+    /**
+     * 注册命令
+     */
+    private void registerCommands() {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> FarewellCommand.register(dispatcher));
+    }
+
+    /**
+     * 注册网络包处理器
+     */
+    private void registerNetworkHandlers() {
+        ModNetworkHandler.registerHandlers();
+    }
+
+    /**
+     * 获取玩家的语言设置
+     *
+     * @param player 玩家
+     * @return 玩家的语言设置，如果未知则返回默认语言
+     */
+    public static String getPlayerLanguage(Player player) {
+        return playerLanguages.getOrDefault(player.getStringUUID(), DEFAULT_LANGUAGE);
+    }
+
+    /**
+     * 设置玩家的语言设置
+     *
+     * @param player 玩家
+     * @param language 语言代码
+     */
+    public static void setPlayerLanguage(Player player, String language) {
+        playerLanguages.put(player.getStringUUID(), language);
+    }
+
+    /**
+     * 克隆玩家语言设置
+     *
+     * @param source 源玩家
+     * @param target 目标玩家
+     */
+    public static void clonePlayerLanguage(Player source, Player target) {
+        if (source instanceof ServerPlayer && target instanceof ServerPlayer) {
+            String sourceUUID = source.getStringUUID();
+            String targetUUID = target.getStringUUID();
+
+            if (playerCapabilityStatus.containsKey(sourceUUID)) {
+                playerCapabilityStatus.put(targetUUID, playerCapabilityStatus.get(sourceUUID));
+            }
+        }
+    }
 }

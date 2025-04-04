@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "narcissus",
+  "version": "0.9",
+  "name": "NarcissusFarewell_MC-Fabric",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "xin.vanilla.narcissus.event.ClientEventHandler"
+    ],
+    "main": [
+      "xin.vanilla.narcissus.NarcissusFarewell"
+    ],
+    "cardinal-components": [
+      "xin.vanilla.narcissus.data.player.PlayerComponentInitializer"
+    ]
+  },
+  "custom": {
+    "cardinal-components": [
+      "narcissus_farewell:player_teleport_data"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "fabric": "*",
+    "minecraft": "1.20.1"
+  }
+}

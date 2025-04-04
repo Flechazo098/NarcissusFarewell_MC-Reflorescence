@@ -5,10 +5,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.NotNull;
 import xin.vanilla.narcissus.data.TeleportRecord;
 import xin.vanilla.narcissus.config.Coordinate;
 import xin.vanilla.narcissus.config.KeyValue;
-import xin.vanilla.narcissus.config.ServerConfig;
 import xin.vanilla.narcissus.enums.ETeleportType;
 import xin.vanilla.narcissus.util.CollectionUtils;
 import xin.vanilla.narcissus.util.DateUtils;
@@ -16,6 +16,8 @@ import xin.vanilla.narcissus.util.DateUtils;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import static xin.vanilla.narcissus.config.ConfigManager.config;
 
 /**
  * 玩家传送数据
@@ -85,12 +87,12 @@ public class PlayerTeleportData implements IPlayerTeleportData {
     }
 
     @Override
-    public @NonNull List<TeleportRecord> getTeleportRecords() {
+    public @NonNull @NotNull List<TeleportRecord> getTeleportRecords() {
         return teleportRecords = CollectionUtils.isNullOrEmpty(teleportRecords) ? new ArrayList<>() : teleportRecords;
     }
 
     @Override
-    public @NonNull List<TeleportRecord> getTeleportRecords(ETeleportType type) {
+    public @NonNull @NotNull List<TeleportRecord> getTeleportRecords(ETeleportType type) {
         return CollectionUtils.isNullOrEmpty(teleportRecords) ? teleportRecords = new ArrayList<>() :
                 teleportRecords.stream().filter(record -> record.getTeleportType() == type).collect(Collectors.toList());
     }
@@ -104,7 +106,7 @@ public class PlayerTeleportData implements IPlayerTeleportData {
     public void addTeleportRecords(TeleportRecord... records) {
         this.getTeleportRecords().addAll(Arrays.asList((records)));
         this.getTeleportRecords().sort(Comparator.comparing(TeleportRecord::getTeleportTime));
-        int limit = ServerConfig.TELEPORT_RECORD_LIMIT.get();
+        int limit = config.teleportRecordLimit;
         int size = this.getTeleportRecords().size();
         if (limit > 0 && limit < size) {
             this.getTeleportRecords().subList(0, size - limit).clear();
@@ -264,6 +266,6 @@ public class PlayerTeleportData implements IPlayerTeleportData {
 
     @Override
     public void save(ServerPlayer player) {
-        player.getCapability(PlayerTeleportDataCapability.PLAYER_DATA).ifPresent(this::copyFrom);
+        PlayerTeleportDataComponent.get(player).copyFrom(this);
     }
 }

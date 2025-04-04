@@ -4,7 +4,6 @@ import lombok.NonNull;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.util.INBTSerializable;
 import xin.vanilla.narcissus.data.TeleportRecord;
 import xin.vanilla.narcissus.config.Coordinate;
 import xin.vanilla.narcissus.config.KeyValue;
@@ -17,8 +16,8 @@ import java.util.Map;
 /**
  * 玩家传送数据
  */
-public interface IPlayerTeleportData extends INBTSerializable<CompoundTag> {
-    // TIPS 加完属性记得去 PlayerTeleportDataStorage 里注册
+public interface IPlayerTeleportData {
+    // TIPS 加完属性记得去 PlayerTeleportDataComponent 里注册
 
     /**
      * 获取传送卡数量
@@ -119,4 +118,9 @@ public interface IPlayerTeleportData extends INBTSerializable<CompoundTag> {
     void copyFrom(IPlayerTeleportData capability);
 
     void save(ServerPlayer player);
+
+    CompoundTag serializeNBT();
+
+    void deserializeNBT(CompoundTag nbt);
+
 }

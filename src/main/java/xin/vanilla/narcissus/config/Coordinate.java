@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import static xin.vanilla.narcissus.config.ConfigManager.config;
+
 @Data
 @Accessors(chain = true)
 @AllArgsConstructor
@@ -120,7 +122,7 @@ public class Coordinate implements Serializable, Cloneable {
     }
 
     public static Coordinate random(ServerPlayer player) {
-        return random(player, ServerConfig.TELEPORT_RANDOM_DISTANCE_LIMIT.get());
+        return random(player, config.teleportRandomDistanceLimit);
     }
 
     public static Coordinate random(ServerPlayer player, int range) {
@@ -129,7 +131,7 @@ public class Coordinate implements Serializable, Cloneable {
 
     public static Coordinate random(ServerPlayer player, int range, ResourceKey<Level> dimension) {
         ServerLevel world = NarcissusUtils.getWorld(dimension);
-        range = Math.min(Math.max(range, 1), ServerConfig.TELEPORT_RANDOM_DISTANCE_LIMIT.get());
+        range = Math.min(Math.max(range, 1), config.teleportRandomDistanceLimit);
         double x = player.getX() + (Math.random() * 2 - 1) * range;
         double y = getRandomWithWeight(NarcissusUtils.getWorldMinY(world), NarcissusUtils.getWorldMaxY(world), (int) player.getY(), 0.75);
         double z = player.getZ() + (Math.random() * 2 - 1) * range;

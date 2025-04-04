@@ -10,6 +10,8 @@ import xin.vanilla.narcissus.util.DateUtils;
 import java.util.Date;
 import java.util.Random;
 
+import static xin.vanilla.narcissus.config.ConfigManager.config;
+
 @Accessors(chain = true)
 public class TeleportRequest {
     private final int id = new Random().nextInt(Integer.MAX_VALUE);
@@ -32,7 +34,7 @@ public class TeleportRequest {
 
     public TeleportRequest setRequestTime(Date requestTime) {
         this.requestTime = requestTime;
-        this.expireTime = requestTime.getTime() + ServerConfig.TELEPORT_REQUEST_EXPIRE_TIME.get() * 1000;
+        this.expireTime = requestTime.getTime() + config.teleportRequestExpireTime * 1000L;
         return this;
     }
 

@@ -29,6 +29,7 @@ public class WorldStageData extends SavedData {
     public WorldStageData() {
     }
 
+
     public static WorldStageData load(CompoundTag nbt) {
         WorldStageData data = new WorldStageData();
         ListTag stageCoordinateNBT = nbt.getList("stageCoordinate", 10);
@@ -98,7 +99,21 @@ public class WorldStageData extends SavedData {
         return get(player.serverLevel());
     }
 
-    public static WorldStageData get(ServerLevel world) {
-        return world.getDataStorage().computeIfAbsent(WorldStageData::load, WorldStageData::new, DATA_NAME);
+    /**
+     * 从服务器世界获取驿站数据
+     * @param level 服务器世界
+     * @return 驿站数据
+     */
+    public static WorldStageData get(ServerLevel level) {
+        return level.getDataStorage().computeIfAbsent(WorldStageData::load, WorldStageData::new, DATA_NAME);
+    }
+
+    /**
+     * 获取所有驿站坐标数据
+     * @param level 服务器世界
+     * @return 驿站坐标数据
+     */
+    public static Map<KeyValue<String, String>, Coordinate> getStageCoordinates(ServerLevel level) {
+        return get(level).getStageCoordinate();
     }
 }

@@ -18,6 +18,8 @@ public class StringUtils {
      * 将字符串转为逻辑真假
      *
      * @param s 0|1|真|假|是|否|true|false|y|n|t|f
+     * <p>
+     * 真真假假假假真真
      */
     public static boolean stringToBoolean(String s) {
         if (null == s) return false;

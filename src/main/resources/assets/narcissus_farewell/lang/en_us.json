@@ -75,6 +75,8 @@
   "word.narcissus_farewell.tp_here_safe": "§asafe",
   "word.narcissus_farewell.tp_here_unsafe": "§eunsafe",
   "word.narcissus_farewell.default": "§7(default)",
+  "message.narcissus_farewell.previous_page": "§bPrevious_page",
+  "message.narcissus_farewell.next_page": "§bNext_page",
   "message.narcissus_farewell.command_disabled": "§eThe command is disabled!",
   "message.narcissus_farewell.command_cooldown": "§eTeleporting cooldown, please try again in %s§e seconds!",
   "message.narcissus_farewell.across_dimension_not_enable": "§eThe server has disabled cross-dimensional teleportation!",

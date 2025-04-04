@@ -1,71 +1,69 @@
 package xin.vanilla.narcissus.data.player;
 
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ICapabilityProvider;
-import net.minecraftforge.common.util.INBTSerializable;
-import net.minecraftforge.common.util.LazyOptional;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import xin.vanilla.narcissus.network.ModNetworkHandler;
+import xin.vanilla.narcissus.network.PlayerDataSyncPacket;
 
 /**
- * 玩家传送数据提供者类，实现了ICapabilityProvider和INBTSerializable接口，
- * 用于管理和序列化玩家的传送数据
+ * 玩家传送数据提供者类
+ * 在 Fabric 中使用 Cardinal Components API，这个类主要作为辅助工具类
  */
-public class PlayerTeleportDataProvider implements ICapabilityProvider, INBTSerializable<CompoundTag> {
-
-    // 玩家传送数据实例，使用PlayerTeleportData类进行管理
-    private IPlayerTeleportData playerData;
-    private final LazyOptional<IPlayerTeleportData> instance = LazyOptional.of(this::getOrCreateCapability);
+public class PlayerTeleportDataProvider {
 
     /**
-     * 获取指定能力的实例
+     * 获取玩家的传送数据
      *
-     * @param cap  要获取的能力实例
-     * @param side 方向，可为空
-     * @param <T>  泛型类型，表示能力的类型
-     * @return 返回包含指定能力实例的LazyOptional对象，如果指定的能力不匹配，则返回空的LazyOptional
-     * <p>
-     * 该方法用于能力系统的交互，只有当请求的能力类型为PlayerTeleportDataCapability.PLAYER_DATA时，
-     * 才会返回相应的实例，否则返回空
+     * @param player 玩家实体
+     * @return 玩家传送数据
      */
-    @Nonnull
-    @Override
-    public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
-        return cap == PlayerTeleportDataCapability.PLAYER_DATA ? instance.cast() : LazyOptional.empty();
+    public static IPlayerTeleportData getData(Player player) {
+        return PlayerTeleportDataComponent.get(player);
     }
 
-    @Nonnull
-    IPlayerTeleportData getOrCreateCapability() {
-        if (playerData == null) {
-            this.playerData = new PlayerTeleportData();
-        }
-        return this.playerData;
+    /**
+     * 保存玩家传送数据
+     *
+     * @param player 玩家实体
+     * @param data 要保存的数据
+     */
+    public static void saveData(Player player, IPlayerTeleportData data) {
+        PlayerTeleportDataComponent component = PlayerTeleportDataComponent.get(player);
+        component.copyFrom(data);
     }
 
     /**
      * 序列化玩家传送数据为NBT格式
      *
-     * @return 返回包含玩家传送数据的CompoundTag对象
-     * <p>
-     * 该方法实现了玩家传送数据的序列化，返回的数据可以用于存储或传输
+     * @param player 玩家实体
+     * @return 包含玩家传送数据的CompoundTag对象
      */
-    @Override
-    public CompoundTag serializeNBT() {
-        return this.getOrCreateCapability().serializeNBT();
+    public static CompoundTag serializeNBT(Player player) {
+        return PlayerTeleportDataComponent.get(player).serializeNBT();
     }
 
     /**
      * 从NBT格式的数据中反序列化玩家传送数据
      *
+     * @param player 玩家实体
      * @param nbt 包含玩家传送数据的CompoundTag对象
-     *            <p>
-     *            该方法实现了玩家传送数据的反序列化，从提供的NBT数据中恢复玩家传送信息
      */
-    @Override
-    public void deserializeNBT(CompoundTag nbt) {
-        this.getOrCreateCapability().deserializeNBT(nbt);
+    public static void deserializeNBT(Player player, CompoundTag nbt) {
+        PlayerTeleportDataComponent.get(player).deserializeNBT(nbt);
     }
+
+    /**
+     * 同步玩家传送数据到客户端
+     *
+     * @param player 服务器玩家
+     */
+    public static void syncPlayerData(ServerPlayer player) {
+        // 创建自定义包并发送到客户端
+        PlayerDataSyncPacket packet = new PlayerDataSyncPacket(player.getUUID(), PlayerTeleportDataComponent.get(player));
+        for (PlayerDataSyncPacket syncPacket : packet.split()) {
+            ModNetworkHandler.sendToPlayer(player, syncPacket);
+        }
+    }
+
 }

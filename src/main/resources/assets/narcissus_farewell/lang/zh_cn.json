@@ -75,6 +75,8 @@
   "word.narcissus_farewell.tp_here_safe": "§a安全地",
   "word.narcissus_farewell.tp_here_unsafe": "§e不安全地",
   "word.narcissus_farewell.default": "§7(默认)",
+  "message.narcissus_farewell.previous_page": "§b上一页",
+  "message.narcissus_farewell.next_page": "§b下一页",
   "message.narcissus_farewell.command_disabled": "§e该指令已被服务器禁用！",
   "message.narcissus_farewell.command_cooldown": "§e传送冷却中，请在%s§e秒后再试！",
   "message.narcissus_farewell.across_dimension_not_enable": "§e服务器未启用跨维度传送！",

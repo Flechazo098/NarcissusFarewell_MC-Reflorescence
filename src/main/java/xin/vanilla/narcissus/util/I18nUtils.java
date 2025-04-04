@@ -18,7 +18,7 @@ public class I18nUtils {
     private static final String DEFAULT_LANGUAGE = "en_us";
     private static final Gson GSON = new Gson();
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final String LANG_PATH = String.format("/assets/%s/lang/", NarcissusFarewell.MODID);
+    private static final String LANG_PATH = String.format("/assets/%s/lang/", NarcissusFarewell.MOD_ID);
     private static final String LANG_FILE_PATH = String.format("%s%%s.json", LANG_PATH);
 
     static {
@@ -74,7 +74,7 @@ public class I18nUtils {
         if (type == EI18nType.PLAIN || type == EI18nType.NONE) {
             result = key;
         } else {
-            result = String.format("%s.%s.%s", type.name().toLowerCase(), NarcissusFarewell.MODID, key);
+            result = String.format("%s.%s.%s", type.name().toLowerCase(), NarcissusFarewell.MOD_ID, key);
         }
         return result;
     }
