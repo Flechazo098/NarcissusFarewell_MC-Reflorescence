@@ -44,6 +44,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -610,6 +611,7 @@ public class NarcissusUtils {
         int chunkX = (int) coordinate.getX() >> 4;
         int chunkZ = (int) coordinate.getZ() >> 4;
 
+        initSuffocatingBlocks();
         return searchForSafeCoordinateInChunk(world, coordinate, chunkX, chunkZ, belowAllowAir);
     }
 
@@ -703,6 +705,7 @@ public class NarcissusUtils {
                     break;
                 }
             } else {
+                initSuffocatingBlocks();
                 if (isSafeCoordinate(world, candidate)) {
                     result = candidate;
                     break;
@@ -718,6 +721,7 @@ public class NarcissusUtils {
         BlockState block = world.getBlockState(coordinate.toBlockPos());
         BlockState blockAbove = world.getBlockState(coordinate.toBlockPos().above());
         BlockState blockBelow = world.getBlockState(coordinate.toBlockPos().below());
+        initUnsafeBlocks();
         return isSafeBlock(world, coordinate, true, block, blockAbove, blockBelow);
     }
 
@@ -725,6 +729,8 @@ public class NarcissusUtils {
         BlockState block = world.getBlockState(coordinate.toBlockPos());
         BlockState blockAbove = world.getBlockState(coordinate.toBlockPos().above());
         BlockState blockBelow = world.getBlockState(coordinate.toBlockPos().below());
+        initUnsafeBlocks();
+        initSuffocatingBlocks();
         return isSafeBlock(world, coordinate, false, block, blockAbove, blockBelow);
     }
 
@@ -736,6 +742,8 @@ public class NarcissusUtils {
      * @param blockBelow 脚下方块
      */
     private static boolean isSafeBlock(Level world, Coordinate coordinate, boolean belowAllowAir, BlockState block, BlockState blockAbove, BlockState blockBelow) {
+        initUnsafeBlocks();
+        initSuffocatingBlocks();
         boolean isCurrentPassable = !block.isCollisionShapeFullBlock(world, coordinate.toBlockPos())
                 && !UNSAFE_BLOCKS.contains(block);
 
@@ -758,6 +766,74 @@ public class NarcissusUtils {
         return isCurrentPassable && isHeadSafe && isBelowValid;
     }
 
+    private static void initUnsafeBlocks() {
+        if (UNSAFE_BLOCKS == null) {
+            UNSAFE_BLOCKS = new ArrayList<>();
+
+            // 完全从配置中加载不安全方块
+            try {
+                var config = AutoConfig.getConfigHolder(ServerConfig.class).getConfig();
+                if (config.unsafeBlocks != null && !config.unsafeBlocks.isEmpty()) {
+                    for (String blockId : config.unsafeBlocks) {
+                        try {
+                            BlockState block = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), new StringReader(blockId), false).blockState();
+                            if (!UNSAFE_BLOCKS.contains(block)) {
+                                UNSAFE_BLOCKS.add(block);
+                            }
+                        } catch (CommandSyntaxException e) {
+                            LOGGER.error("Failed to parse unsafe block: " + blockId, e);
+                        }
+                    }
+                } else {
+                    // 如果配置为空，添加一些默认值以防止意外
+                    LOGGER.warn("No unsafe blocks defined in config, using fallback defaults");
+                    UNSAFE_BLOCKS.add(Blocks.LAVA.defaultBlockState());
+                    UNSAFE_BLOCKS.add(Blocks.FIRE.defaultBlockState());
+                }
+            } catch (Exception e) {
+                LOGGER.error("Failed to load unsafe blocks from config", e);
+                // 出错时添加基本的安全保障
+                UNSAFE_BLOCKS.add(Blocks.LAVA.defaultBlockState());
+                UNSAFE_BLOCKS.add(Blocks.FIRE.defaultBlockState());
+            }
+        }
+    }
+
+    /**
+     * Initialize the SUFFOCATING_BLOCKS list if it hasn't been initialized yet
+     */
+    private static void initSuffocatingBlocks() {
+        if (SUFFOCATING_BLOCKS == null) {
+            SUFFOCATING_BLOCKS = new ArrayList<>();
+
+            // 完全从配置中加载窒息方块
+            try {
+                var config = AutoConfig.getConfigHolder(ServerConfig.class).getConfig();
+                if (config.suffocatingBlocks != null && !config.suffocatingBlocks.isEmpty()) {
+                    for (String blockId : config.suffocatingBlocks) {
+                        try {
+                            BlockState block = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), new StringReader(blockId), false).blockState();
+                            if (!SUFFOCATING_BLOCKS.contains(block)) {
+                                SUFFOCATING_BLOCKS.add(block);
+                            }
+                        } catch (CommandSyntaxException e) {
+                            LOGGER.error("Failed to parse suffocating block: {}", blockId, e);
+                        }
+                    }
+                } else {
+                    // 如果配置为空，添加一些默认值以防止意外
+                    LOGGER.warn("No suffocating blocks defined in config, using fallback defaults");
+                    SUFFOCATING_BLOCKS.add(Blocks.LAVA.defaultBlockState());
+                    SUFFOCATING_BLOCKS.add(Blocks.WATER.defaultBlockState());
+                }
+            } catch (Exception e) {
+                LOGGER.error("Failed to load suffocating blocks from config", e);
+                // 出错时添加基本的安全保障
+                SUFFOCATING_BLOCKS.add(Blocks.LAVA.defaultBlockState());
+                SUFFOCATING_BLOCKS.add(Blocks.WATER.defaultBlockState());
+            }
+        }
+    }
     // endregion 安全坐标
 
     // region 坐标查找
@@ -1009,6 +1085,7 @@ public class NarcissusUtils {
      * 执行传送请求
      */
     public static void teleportTo(@NonNull TeleportRequest request) {
+        initSuffocatingBlocks();
         teleportTo(request.getRequester(), request.getTarget(), request.getTeleportType(), request.isSafe());
     }
 
@@ -1063,6 +1140,7 @@ public class NarcissusUtils {
                                 blockState = null;
                             }
                             if (blockState != null) {
+                                initSuffocatingBlocks();
                                 Coordinate airCoordinate = findSafeCoordinate(finalAfter, true);
                                 if (!airCoordinate.toXyzString().equals(finalAfter.toXyzString())) {
                                     finalAfter = airCoordinate;
