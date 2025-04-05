@@ -19,9 +19,6 @@ import java.util.stream.Stream;
 @Config(name = "narcissus_server")
 public class ServerConfig implements ConfigData {
 
-    // 移除 ForgeConfigSpec 相关代码
-    // public static final ForgeConfigSpec SERVER_CONFIG;
-
     // region 基础设置
 
     /**

@@ -18,12 +18,22 @@
     ],
     "cardinal-components": [
       "xin.vanilla.narcissus.data.player.PlayerComponentInitializer"
+    ],
+    "modmenu": [
+      "xin.vanilla.narcissus.compat.modmenu.ModMenuIntegration"
     ]
   },
   "custom": {
     "cardinal-components": [
       "narcissus_farewell:player_teleport_data"
-    ]
+    ],
+    "modmenu": {
+      "links": {
+        "modmenu.discord": "https://discord.gg/jEGF5fb"
+      },
+      "badges": [],
+      "update_checker": true
+    }
   },
   "depends": {
     "fabricloader": ">=0.16.10",
