@@ -13,7 +13,7 @@
 
 ## 目录
 
-- [Narcissus Farewell](#narcissus_farewell)
+- [Narcissus Farewell](#水仙辞：重绽)
     - [目录](#目录)
     - [释义](#释义)
     - [介绍](#介绍)
@@ -68,7 +68,7 @@
 
 ## 配置说明
 
-本地配置文件路径 `world/serverconfig/narcissus_farewell-server.toml`，其他的信息不再赘述，请参考 [默认配置文件](narcissus_farewell-server.toml) 中的注释。
+提供了 [Cloth Config API](https://modrinth.com/mod/cloth-config) 的可视化配置页面，包含丰富的文本提示。
 
 
 ## 指令说明
