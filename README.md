@@ -1,6 +1,15 @@
-# Narcissus Farewell (水仙辞)
+# 水仙辞：重绽 (Narcissus Farewell: Reflorescence)
 
-一个 Minecraft Forge 传送指令 Mod。
+## 特别说明
+
+"水仙辞：重绽" 是一款源自 [水仙辞](https://github.com/TinyTsuki) 的 Minecraft Fabric 传送指令 Mod。
+
+原版 "Narcissus Farewell" 可在以下链接找到：
+- [水仙辞 原始仓库](https://github.com/TinyTsuki/NarcissusFarewell_MC)
+
+我们在此向原作者 [TinyTsuki](https://github.com/TinyTsuki) 表达最深的感谢，感谢你对 Minecraft 社区的杰出贡献！
+
+
 
 ## 目录
 
