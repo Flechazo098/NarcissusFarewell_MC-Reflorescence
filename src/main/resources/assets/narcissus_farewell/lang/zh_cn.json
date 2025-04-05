@@ -564,5 +564,8 @@
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackConf": "传送到上次传送点代价配置",
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackConf.@Tooltip": "§a✦ 传送到上次传送点的代价配置 §e[代价规则]§r\n§7▸ §3物品代价(ITEM)§r\n   §8→ §7格式：物品ID§r（支持NBT）\n   §b示例§r: minecraft:diamond_sword{Damage:0}\n\n§7▸ §6指令代价(COMMAND)§r\n   §8→ §7格式：可执行指令字符串\n   §8→ §e动态参数§r: 使用'[num]'表示代价数量\n   §b示例§r: /give @s minecraft:emerald [num]  (这是......奖励？)\n\n§c※ 特殊说明§r\n§8▸ NBT数据§r 需严格符合SNBT格式\n§8▸ 指令执行者§r 默认为触发传送的玩家",
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate": "传送到上次传送点代价倍率",
-  "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate.@Tooltip": "传送到上次传送点的代价倍率，代价会和传送前后坐标之间的距离相乘"
+  "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate.@Tooltip": "传送到上次传送点的代价倍率，代价会和传送前后坐标之间的距离相乘",
+
+  "modmenu.nameTranslation.narcissus_farewell": "水仙辞：重绽",
+  "modmenu.descriptionTranslation.narcissus_farewell": "这是一个传送Mod，拥有各种常见的传送指令，并且支持自定义传送指令。"
 }

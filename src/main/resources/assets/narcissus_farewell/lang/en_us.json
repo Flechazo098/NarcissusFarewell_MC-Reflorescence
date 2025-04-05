@@ -564,5 +564,8 @@
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackConf": "Return TP Cost Configuration",
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackConf.@Tooltip": "§a✦ Return Teleport Cost Rules §e[Configuration]§r\n§7▸ §3Item Cost (ITEM)§r\n   §8→ §7Format: Item ID§r (with NBT support)\n   §bExample§r: minecraft:diamond_sword{Damage:0}\n\n§7▸ §6Command Cost (COMMAND)§r\n   §8→ §7Format: Executable command string\n   §8→ §eDynamic parameter§r: Use '[num]' for cost amount\n   §bExample§r: /give @s minecraft:emerald [num]  (A reward?)\n\n§c※ Special Notes§r\n§8▸ NBT data§r must follow SNBT format\n§8▸ Commands§r execute as the teleporting player",
   "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate": "Return TP Cost Multiplier",
-  "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate.@Tooltip": "Multiplies cost by teleportation distance"
+  "text.autoconfig.narcissus_server.option.costConfig.costTpBackRate.@Tooltip": "Multiplies cost by teleportation distance",
+
+  "modmenu.nameTranslation.narcissus_farewell": "NarcissusFarewell Reflorescence",
+  "modmenu.descriptionTranslation.narcissus_farewell": "This is a teleportation mod that has a variety of common teleportation commands, and supports custom teleportation commands."
 }

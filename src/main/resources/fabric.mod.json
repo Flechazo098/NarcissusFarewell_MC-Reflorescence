@@ -1,13 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "narcissus",
-  "version": "0.9",
-  "name": "NarcissusFarewell_MC-Fabric",
-  "description": "",
+  "id": "narcissus_farewell",
+  "version": "1.0.9",
+  "name": "NarcissusFarewell Reflorescence",
+  "description": "这是一个传送 Mod，拥有各种常见的传送指令，并且支持自定义传送指令。",
   "authors": [],
-  "contact": {},
+  "contact": {
+    "sources": "https://github.com/Flechazo098/NarcissusFarewell_MC-Reflorescence",
+    "issues": "https://github.com/Flechazo098/NarcissusFarewell_MC-Reflorescence/issues"
+  },
   "license": "MIT",
-  "icon": "icon.png",
+  "icon": "assets/narcissus_farewell/logo.png",
   "environment": "*",
   "entrypoints": {
     "client": [
@@ -29,7 +32,7 @@
     ],
     "modmenu": {
       "links": {
-        "modmenu.discord": "https://discord.gg/jEGF5fb"
+        "curseforge": ""
       },
       "badges": [],
       "update_checker": true

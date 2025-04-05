@@ -9,17 +9,21 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Random;
 
+/**
+ *  ModMenu 只支持正方形icon，这个功能废了（不会画icon）
+ */
+@Deprecated
 public class LogoModifier {
 
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final String MOD_ID = "narcissus";
+    private static final String MOD_ID = "narcissus_farewell";
     private static final Random RANDOM = new Random();
     private static boolean initialized = false;
 
@@ -31,37 +35,15 @@ public class LogoModifier {
         initialized = true;
 
         try {
-            // 获取模组目录
-            Path modDir = FabricLoader.getInstance().getModContainer(MOD_ID)
-                    .map(container -> new File(container.getOrigin().toString()).toPath())
-                    .orElse(null);
+            // 确保图标目录存在
+            ensureIconDirectoryExists();
 
-            if (modDir == null) {
-                LOGGER.error("无法找到模组目录");
-                return;
-            }
+            // 复制默认图标
+            copyDefaultIcon();
 
-            // 注册资源重载监听器
-            ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
-                    new SimpleSynchronousResourceReloadListener() {
-                        @Override
-                        public ResourceLocation getFabricId() {
-                            return new ResourceLocation(MOD_ID, "logo_modifier");
-                        }
+            // 注册资源重载监听器用于动态更换图标
+            registerResourceReloadListener();
 
-                        @Override
-                        public void onResourceManagerReload(ResourceManager resourceManager) {
-                            try {
-                                updateModIcon(modDir);
-                            } catch (Exception e) {
-                                LOGGER.error("更新模组图标时出错", e);
-                            }
-                        }
-                    }
-            );
-
-            // 初始化时也更新一次图标
-            updateModIcon(modDir);
             LOGGER.info("图标修改器已初始化");
         } catch (Exception e) {
             LOGGER.error("初始化图标修改器时出错", e);
@@ -69,33 +51,95 @@ public class LogoModifier {
     }
 
     /**
-     * 更新模组图标
-     * @param modDir 模组目录
+     * 确保图标目录存在
      */
-    private static void updateModIcon(Path modDir) throws IOException {
-        // 获取随机图标名称
-        String logoName = getLogoName();
+    private static void ensureIconDirectoryExists() throws IOException {
+        Path iconDir = FabricLoader.getInstance().getGameDir()
+                .resolve("config")
+                .resolve(MOD_ID)
+                .resolve("icon");
+        Files.createDirectories(iconDir);
+    }
 
-        // 源图标路径（从资源目录）
-        Path sourcePath = modDir.resolve("resources").resolve(logoName);
+    /**
+     * 复制默认图标
+     */
+    private static void copyDefaultIcon() {
+        try {
+            // 源图标路径
+            String iconResourcePath = "assets/narcissus_farewell/logo.png";
+            InputStream iconStream = LogoModifier.class.getResourceAsStream(iconResourcePath);
 
-        // 目标图标路径（fabric.mod.json 中引用的图标）
-        Path targetPath = modDir.resolve("icon.png");
+            if (iconStream == null) {
+                LOGGER.error("无法从资源路径加载图标: {}", iconResourcePath);
+                return;
+            }
 
-        if (Files.exists(sourcePath)) {
-            // 复制图标文件
-            Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-            LOGGER.debug("已将图标更新为: {}", logoName);
-        } else {
-            LOGGER.warn("找不到图标文件: {}", sourcePath);
+            // 目标图标路径
+            Path iconDir = FabricLoader.getInstance().getGameDir()
+                    .resolve("assets")
+                    .resolve(MOD_ID)
+                    .resolve("icon");
+            Path iconPath = iconDir.resolve("icon.png");
+
+            // 复制图标
+            Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
+            iconStream.close();
+
+            LOGGER.info("已成功复制默认图标到: {}", iconPath);
+        } catch (Exception e) {
+            LOGGER.error("复制默认图标时出错", e);
         }
     }
 
     /**
-     * 获取随机图标名称
-     * @return 图标文件名
+     * 注册资源重载监听器
      */
-    public static String getLogoName() {
-        return RANDOM.nextDouble() > 0.5 ? "logo_.png" : "logo.png";
+    private static void registerResourceReloadListener() {
+        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
+                new SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public ResourceLocation getFabricId() {
+                        return new ResourceLocation(MOD_ID, "logo_modifier");
+                    }
+
+                    @Override
+                    public void onResourceManagerReload(ResourceManager resourceManager) {
+                        try {
+                            // 随机选择一个图标
+                            String logoName = getRandomLogoName();
+                            String iconResourcePath = logoName;
+                            InputStream iconStream = LogoModifier.class.getResourceAsStream(iconResourcePath);
+
+                            if (iconStream == null) {
+                                LOGGER.error("无法从资源路径加载图标: {}", iconResourcePath);
+                                return;
+                            }
+
+                            // 目标图标路径
+                            Path iconDir = FabricLoader.getInstance().getGameDir()
+                                    .resolve("assets")
+                                    .resolve(MOD_ID)
+                                    .resolve("icon");
+                            Path iconPath = iconDir.resolve("icon.png");
+
+                            // 复制图标
+                            Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
+                            iconStream.close();
+
+                            LOGGER.info("已成功更新图标: {}", logoName);
+                        } catch (Exception e) {
+                            LOGGER.error("更新图标时出错", e);
+                        }
+                    }
+                });
+    }
+
+    /**
+     * 获取随机图标名称
+     */
+    private static String getRandomLogoName() {
+        String[] logoNames = {"assets/narcissus_farewell/logo.png", "logo_.png"};
+        return logoNames[RANDOM.nextInt(logoNames.length)];
     }
 }
