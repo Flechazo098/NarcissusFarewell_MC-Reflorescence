@@ -68,7 +68,7 @@
 
 ## 配置说明
 
-提供了 [Cloth Config API](https://modrinth.com/mod/cloth-config) 的可视化配置页面，包含丰富的文本提示。
+提供了 [Cloth Config API](https://modrinth.com/mod/cloth-config) 联合 [Mod Menu](https://modrinth.com/mod/modmenu) 的可视化配置页面，包含丰富的文本提示。
 
 
 ## 指令说明
