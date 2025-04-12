@@ -22,7 +22,6 @@ import xin.vanilla.narcissus.util.NarcissusUtils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * NarcissusFarewell 主类
@@ -32,7 +31,6 @@ public class NarcissusFarewell implements ModInitializer {
 
     public static final String MOD_ID = "narcissus_farewell";
     public static final String DEFAULT_COMMAND_PREFIX = "farewell";
-    public static final String DEFAULT_LANGUAGE = "en_us";
 
     /**
      * -- GETTER --
@@ -154,7 +152,7 @@ public class NarcissusFarewell implements ModInitializer {
      * @return 玩家的语言设置，如果未知则返回默认语言
      */
     public static String getPlayerLanguage(Player player) {
-        return playerLanguages.getOrDefault(player.getStringUUID(), DEFAULT_LANGUAGE);
+        return playerLanguages.getOrDefault(player.getStringUUID(), ConfigManager.getConfig().defaultLanguage);
     }
 
     /**

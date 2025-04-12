@@ -2,16 +2,14 @@ package xin.vanilla.narcissus.event;
 
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xin.vanilla.narcissus.NarcissusFarewell;
+import xin.vanilla.narcissus.config.ConfigManager;
 import xin.vanilla.narcissus.config.Coordinate;
-import xin.vanilla.narcissus.config.ServerConfig;
 import xin.vanilla.narcissus.config.TeleportRequest;
 import xin.vanilla.narcissus.data.TeleportRecord;
 import xin.vanilla.narcissus.data.player.IPlayerTeleportData;
@@ -25,7 +23,6 @@ import xin.vanilla.narcissus.util.NarcissusUtils;
 import java.util.Comparator;
 import java.util.Date;
 
-import static xin.vanilla.narcissus.config.ConfigManager.config;
 
 /**
  * 服务器事件处理
@@ -46,12 +43,12 @@ public class ServerEventHandler {
             }
 
             // 给予传送卡
-            if (config.teleportCard) {
+            if (ConfigManager.getConfig().teleportCard) {
                 IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
                 Date current = new Date();
                 if (DateUtils.toDateInt(data.getLastCardTime()) < DateUtils.toDateInt(current)) {
                     data.setLastCardTime(current);
-                    data.plusTeleportCard(config.teleportCardDaily);
+                    data.plusTeleportCard(ConfigManager.getConfig().teleportCardDaily);
                 }
             }
         });

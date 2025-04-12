@@ -10,7 +10,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import net.minecraft.network.chat.*;
 import net.minecraft.server.level.ServerPlayer;
-import xin.vanilla.narcissus.NarcissusFarewell;
+import xin.vanilla.narcissus.config.ConfigManager;
 import xin.vanilla.narcissus.enums.EI18nType;
 
 import java.io.Serializable;
@@ -164,9 +164,8 @@ public class Component implements Cloneable, Serializable {
      * 获取语言代码
      */
     public @NonNull String getLanguageCode() {
-        return this.languageCode == null ? NarcissusFarewell.DEFAULT_LANGUAGE : this.languageCode;
+        return this.languageCode == null ? ConfigManager.getConfig().defaultLanguage : this.languageCode;
     }
-
     /**
      * 是否有阴影
      */

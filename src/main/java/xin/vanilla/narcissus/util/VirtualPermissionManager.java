@@ -6,14 +6,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import me.shedaniel.autoconfig.AutoConfig;
 import net.minecraft.world.entity.player.Player;
+import xin.vanilla.narcissus.config.ConfigManager;
 import xin.vanilla.narcissus.config.ServerConfig;
 import xin.vanilla.narcissus.enums.ECommandType;
 import xin.vanilla.narcissus.enums.EOperationType;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static xin.vanilla.narcissus.config.ConfigManager.config;
 
 public class VirtualPermissionManager {
 
@@ -113,7 +112,7 @@ public class VirtualPermissionManager {
      */
     private static void updateRuleList(String stringUUID, Set<ECommandType> types) {
         OP_MAP.put(stringUUID, types);
-        config.opList = serialize().toString();
+        ConfigManager.getConfig().opList = serialize().toString();
         AutoConfig.getConfigHolder(ServerConfig.class).save();
     }
 
@@ -140,7 +139,7 @@ public class VirtualPermissionManager {
     private static Map<String, Set<ECommandType>> deserialize() {
         Map<String, Set<ECommandType>> result;
         try {
-            result = deserialize(GSON.fromJson(config.opList, JsonObject.class));
+            result = deserialize(GSON.fromJson(ConfigManager.getConfig().opList, JsonObject.class));
         } catch (Exception e) {
             result = new HashMap<>();
         }

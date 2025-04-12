@@ -66,8 +66,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import static xin.vanilla.narcissus.config.ConfigManager.config;
+import java.util.stream.Stream;
 
 public class NarcissusUtils {
 
@@ -118,12 +117,12 @@ public class NarcissusUtils {
     // region 指令相关
 
     public static String getCommandPrefix() {
-        String commandPrefix = config.commandPrefix;
+        String commandPrefix = ConfigManager.getConfig().commandPrefix;
         if (StringUtils.isNullOrEmptyEx(commandPrefix) || !commandPrefix.matches("^(\\w ?)+$")) {
-            config.commandPrefix = NarcissusFarewell.DEFAULT_COMMAND_PREFIX;
-            AutoConfig.getConfigHolder(ServerConfig.class).save();
+            ConfigManager.getConfig().commandPrefix = NarcissusFarewell.DEFAULT_COMMAND_PREFIX;
+            ConfigManager.save();
         }
-        return config.commandPrefix.trim();
+        return ConfigManager.getConfig().commandPrefix.trim();
     }
     /**
      * 判断指令类型是否开启
@@ -132,48 +131,51 @@ public class NarcissusUtils {
      */
     public static boolean isCommandEnabled(ECommandType type) {
         return switch (type) {
-            case FEED, FEED_OTHER, FEED_CONCISE, FEED_OTHER_CONCISE -> config.switchConfig.switchFeed;
-            case TP_COORDINATE, TP_COORDINATE_CONCISE -> config.switchConfig.switchTpCoordinate;
-            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> config.switchConfig.switchTpStructure;
-            case TP_ASK, TP_ASK_YES, TP_ASK_NO, TP_ASK_CONCISE, TP_ASK_YES_CONCISE, TP_ASK_NO_CONCISE ->
-                    config.switchConfig.switchTpAsk;
-            case TP_HERE, TP_HERE_YES, TP_HERE_NO, TP_HERE_CONCISE, TP_HERE_YES_CONCISE, TP_HERE_NO_CONCISE ->
-                    config.switchConfig.switchTpHere;
-            case TP_RANDOM, TP_RANDOM_CONCISE -> config.switchConfig.switchTpRandom;
+            case CARD, SET_CARD, CARD_CONCISE, SET_CARD_CONCISE -> ConfigManager.getConfig().teleportCard;
+            case SHARE, SHARE_CONCISE -> ConfigManager.getConfig().switchConfig.switchShare;
+            case FEED, FEED_OTHER, FEED_CONCISE, FEED_OTHER_CONCISE ->
+                    ConfigManager.getConfig().switchConfig.switchFeed;
+            case TP_COORDINATE, TP_COORDINATE_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpCoordinate;
+            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpStructure;
+            case TP_ASK, TP_ASK_YES, TP_ASK_NO, TP_ASK_CANCEL, TP_ASK_CONCISE, TP_ASK_YES_CONCISE, TP_ASK_NO_CONCISE,
+                 TP_ASK_CANCEL_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpAsk;
+            case TP_HERE, TP_HERE_YES, TP_HERE_NO, TP_HERE_CANCEL, TP_HERE_CONCISE, TP_HERE_YES_CONCISE,
+                 TP_HERE_NO_CONCISE, TP_HERE_CANCEL_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpHere;
+            case TP_RANDOM, TP_RANDOM_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpRandom;
             case TP_SPAWN, TP_SPAWN_OTHER, TP_SPAWN_CONCISE, TP_SPAWN_OTHER_CONCISE ->
-                    config.switchConfig.switchTpSpawn;
-            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> config.switchConfig.switchTpWorldSpawn;
-            case TP_TOP, TP_TOP_CONCISE -> config.switchConfig.switchTpTop;
-            case TP_BOTTOM, TP_BOTTOM_CONCISE -> config.switchConfig.switchTpBottom;
-            case TP_UP, TP_UP_CONCISE -> config.switchConfig.switchTpUp;
-            case TP_DOWN, TP_DOWN_CONCISE -> config.switchConfig.switchTpDown;
-            case TP_VIEW, TP_VIEW_CONCISE -> config.switchConfig.switchTpView;
+                    ConfigManager.getConfig().switchConfig.switchTpSpawn;
+            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpWorldSpawn;
+            case TP_TOP, TP_TOP_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpTop;
+            case TP_BOTTOM, TP_BOTTOM_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpBottom;
+            case TP_UP, TP_UP_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpUp;
+            case TP_DOWN, TP_DOWN_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpDown;
+            case TP_VIEW, TP_VIEW_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpView;
             case TP_HOME, SET_HOME, DEL_HOME, GET_HOME, TP_HOME_CONCISE, SET_HOME_CONCISE, DEL_HOME_CONCISE,
-                 GET_HOME_CONCISE -> config.switchConfig.switchTpHome;
+                 GET_HOME_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpHome;
             case TP_STAGE, SET_STAGE, DEL_STAGE, GET_STAGE, TP_STAGE_CONCISE, SET_STAGE_CONCISE, DEL_STAGE_CONCISE,
-                 GET_STAGE_CONCISE -> config.switchConfig.switchTpStage;
-            case TP_BACK, TP_BACK_CONCISE -> config.switchConfig.switchTpBack;
+                 GET_STAGE_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpStage;
+            case TP_BACK, TP_BACK_CONCISE -> ConfigManager.getConfig().switchConfig.switchTpBack;
             default -> true;
         };
     }
 
     public static String getCommand(ETeleportType type) {
         return switch (type) {
-            case TP_COORDINATE -> config.commandConfig.commandTpCoordinate;
-            case TP_STRUCTURE -> config.commandConfig.commandTpStructure;
-            case TP_ASK -> config.commandConfig.commandTpAsk;
-            case TP_HERE -> config.commandConfig.commandTpHere;
-            case TP_RANDOM -> config.commandConfig.commandTpRandom;
-            case TP_SPAWN -> config.commandConfig.commandTpSpawn;
-            case TP_WORLD_SPAWN -> config.commandConfig.commandTpWorldSpawn;
-            case TP_TOP -> config.commandConfig.commandTpTop;
-            case TP_BOTTOM -> config.commandConfig.commandTpBottom;
-            case TP_UP -> config.commandConfig.commandTpUp;
-            case TP_DOWN -> config.commandConfig.commandTpDown;
-            case TP_VIEW -> config.commandConfig.commandTpView;
-            case TP_HOME -> config.commandConfig.commandTpHome;
-            case TP_STAGE -> config.commandConfig.commandTpStage;
-            case TP_BACK -> config.commandConfig.commandTpBack;
+            case TP_COORDINATE -> ConfigManager.getConfig().commandConfig.commandTpCoordinate;
+            case TP_STRUCTURE -> ConfigManager.getConfig().commandConfig.commandTpStructure;
+            case TP_ASK -> ConfigManager.getConfig().commandConfig.commandTpAsk;
+            case TP_HERE -> ConfigManager.getConfig().commandConfig.commandTpHere;
+            case TP_RANDOM -> ConfigManager.getConfig().commandConfig.commandTpRandom;
+            case TP_SPAWN -> ConfigManager.getConfig().commandConfig.commandTpSpawn;
+            case TP_WORLD_SPAWN -> ConfigManager.getConfig().commandConfig.commandTpWorldSpawn;
+            case TP_TOP -> ConfigManager.getConfig().commandConfig.commandTpTop;
+            case TP_BOTTOM -> ConfigManager.getConfig().commandConfig.commandTpBottom;
+            case TP_UP -> ConfigManager.getConfig().commandConfig.commandTpUp;
+            case TP_DOWN -> ConfigManager.getConfig().commandConfig.commandTpDown;
+            case TP_VIEW -> ConfigManager.getConfig().commandConfig.commandTpView;
+            case TP_HOME -> ConfigManager.getConfig().commandConfig.commandTpHome;
+            case TP_STAGE -> ConfigManager.getConfig().commandConfig.commandTpStage;
+            case TP_BACK -> ConfigManager.getConfig().commandConfig.commandTpBack;
             default -> "";
         };
     }
@@ -182,159 +184,175 @@ public class NarcissusUtils {
         String prefix = NarcissusUtils.getCommandPrefix();
         return switch (type) {
             case HELP -> prefix + " help";
-            case DIMENSION -> prefix + " " + config.commandConfig.commandDimension;
-            case DIMENSION_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandDimension : "";
-            case UUID -> prefix + " " + config.commandConfig.commandUuid;
-            case UUID_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandUuid : "";
-            case FEED, FEED_OTHER -> prefix + " " + config.commandConfig.commandFeed;
-            case FEED_CONCISE, FEED_OTHER_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandFeed : "";
-            case TP_COORDINATE -> prefix + " " + config.commandConfig.commandTpCoordinate;
-            case TP_COORDINATE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpCoordinate : "";
-            case TP_STRUCTURE -> prefix + " " + config.commandConfig.commandTpStructure;
-            case TP_STRUCTURE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpStructure : "";
-            case TP_ASK -> prefix + " " + config.commandConfig.commandTpAsk;
-            case TP_ASK_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpAsk : "";
-            case TP_ASK_YES -> prefix + " " + config.commandConfig.commandTpAskYes;
-            case TP_ASK_YES_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpAskYes : "";
-            case TP_ASK_NO -> prefix + " " + config.commandConfig.commandTpAskNo;
-            case TP_ASK_NO_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpAskNo : "";
-            case TP_HERE -> prefix + " " + config.commandConfig.commandTpHere;
-            case TP_HERE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpHere : "";
-            case TP_HERE_YES -> prefix + " " + config.commandConfig.commandTpHereYes;
-            case TP_HERE_YES_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpHereYes : "";
-            case TP_HERE_NO -> prefix + " " + config.commandConfig.commandTpHereNo;
-            case TP_HERE_NO_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpHereNo : "";
-            case TP_RANDOM -> prefix + " " + config.commandConfig.commandTpRandom;
-            case TP_RANDOM_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpRandom : "";
-            case TP_SPAWN, TP_SPAWN_OTHER -> prefix + " " + config.commandConfig.commandTpSpawn;
+            case LANGUAGE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandLanguage;
+            case LANGUAGE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandLanguage : "";
+            case DIMENSION -> prefix + " " + ConfigManager.getConfig().commandConfig.commandDimension;
+            case DIMENSION_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandDimension : "";
+            case UUID -> prefix + " " + ConfigManager.getConfig().commandConfig.commandUuid;
+            case UUID_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandUuid : "";
+            case CARD, CARD_CONCISE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandCard;
+            case SET_CARD, SET_CARD_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandCard : "";
+            case SHARE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandShare;
+            case SHARE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandShare : "";
+            case FEED, FEED_OTHER -> prefix + " " + ConfigManager.getConfig().commandConfig.commandFeed;
+            case FEED_CONCISE, FEED_OTHER_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandFeed : "";
+            case TP_COORDINATE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpCoordinate;
+            case TP_COORDINATE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpCoordinate : "";
+            case TP_STRUCTURE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpStructure;
+            case TP_STRUCTURE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpStructure : "";
+            case TP_ASK -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpAsk;
+            case TP_ASK_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpAsk : "";
+            case TP_ASK_YES -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpAskYes;
+            case TP_ASK_YES_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpAskYes : "";
+            case TP_ASK_NO -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpAskNo;
+            case TP_ASK_NO_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpAskNo : "";
+            case TP_ASK_CANCEL -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpAskCancel;
+            case TP_ASK_CANCEL_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpAskCancel : "";
+            case TP_HERE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpHere;
+            case TP_HERE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpHere : "";
+            case TP_HERE_YES -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpHereYes;
+            case TP_HERE_YES_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpHereYes : "";
+            case TP_HERE_NO -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpHereNo;
+            case TP_HERE_NO_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpHereNo : "";
+            case TP_HERE_CANCEL -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpHereCancel;
+            case TP_HERE_CANCEL_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpHereCancel : "";
+            case TP_RANDOM -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpRandom;
+            case TP_RANDOM_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpRandom : "";
+            case TP_SPAWN, TP_SPAWN_OTHER -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpSpawn;
             case TP_SPAWN_CONCISE, TP_SPAWN_OTHER_CONCISE ->
-                    isConciseEnabled(type) ? config.commandConfig.commandTpSpawn : "";
-            case TP_WORLD_SPAWN -> prefix + " " + config.commandConfig.commandTpWorldSpawn;
-            case TP_WORLD_SPAWN_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpWorldSpawn : "";
-            case TP_TOP -> prefix + " " + config.commandConfig.commandTpTop;
-            case TP_TOP_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpTop : "";
-            case TP_BOTTOM -> prefix + " " + config.commandConfig.commandTpBottom;
-            case TP_BOTTOM_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpBottom : "";
-            case TP_UP -> prefix + " " + config.commandConfig.commandTpUp;
-            case TP_UP_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpUp : "";
-            case TP_DOWN -> prefix + " " + config.commandConfig.commandTpDown;
-            case TP_DOWN_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpDown : "";
-            case TP_VIEW -> prefix + " " + config.commandConfig.commandTpView;
-            case TP_VIEW_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpView : "";
-            case TP_HOME -> prefix + " " + config.commandConfig.commandTpHome;
-            case TP_HOME_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpHome : "";
-            case SET_HOME -> prefix + " " + config.commandConfig.commandSetHome;
-            case SET_HOME_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandSetHome : "";
-            case DEL_HOME -> prefix + " " + config.commandConfig.commandDelHome;
-            case DEL_HOME_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandDelHome : "";
-            case GET_HOME -> prefix + " " + config.commandConfig.commandGetHome;
-            case GET_HOME_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandGetHome : "";
-            case TP_STAGE -> prefix + " " + config.commandConfig.commandTpStage;
-            case TP_STAGE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpStage : "";
-            case SET_STAGE -> prefix + " " + config.commandConfig.commandSetStage;
-            case SET_STAGE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandSetStage : "";
-            case DEL_STAGE -> prefix + " " + config.commandConfig.commandDelStage;
-            case DEL_STAGE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandDelStage : "";
-            case GET_STAGE -> prefix + " " + config.commandConfig.commandGetStage;
-            case GET_STAGE_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandGetStage : "";
-            case TP_BACK -> prefix + " " + config.commandConfig.commandTpBack;
-            case TP_BACK_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandTpBack : "";
-            case VIRTUAL_OP -> prefix + " " + config.commandConfig.commandVirtualOp;
-            case VIRTUAL_OP_CONCISE -> isConciseEnabled(type) ? config.commandConfig.commandVirtualOp : "";
+                    isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpSpawn : "";
+            case TP_WORLD_SPAWN -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpWorldSpawn;
+            case TP_WORLD_SPAWN_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpWorldSpawn : "";
+            case TP_TOP -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpTop;
+            case TP_TOP_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpTop : "";
+            case TP_BOTTOM -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpBottom;
+            case TP_BOTTOM_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpBottom : "";
+            case TP_UP -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpUp;
+            case TP_UP_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpUp : "";
+            case TP_DOWN -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpDown;
+            case TP_DOWN_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpDown : "";
+            case TP_VIEW -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpView;
+            case TP_VIEW_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpView : "";
+            case TP_HOME -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpHome;
+            case TP_HOME_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpHome : "";
+            case SET_HOME -> prefix + " " + ConfigManager.getConfig().commandConfig.commandSetHome;
+            case SET_HOME_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandSetHome : "";
+            case DEL_HOME -> prefix + " " + ConfigManager.getConfig().commandConfig.commandDelHome;
+            case DEL_HOME_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandDelHome : "";
+            case GET_HOME -> prefix + " " + ConfigManager.getConfig().commandConfig.commandGetHome;
+            case GET_HOME_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandGetHome : "";
+            case TP_STAGE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpStage;
+            case TP_STAGE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpStage : "";
+            case SET_STAGE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandSetStage;
+            case SET_STAGE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandSetStage : "";
+            case DEL_STAGE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandDelStage;
+            case DEL_STAGE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandDelStage : "";
+            case GET_STAGE -> prefix + " " + ConfigManager.getConfig().commandConfig.commandGetStage;
+            case GET_STAGE_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandGetStage : "";
+            case TP_BACK -> prefix + " " + ConfigManager.getConfig().commandConfig.commandTpBack;
+            case TP_BACK_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandTpBack : "";
+            case VIRTUAL_OP -> prefix + " " + ConfigManager.getConfig().commandConfig.commandVirtualOp;
+            case VIRTUAL_OP_CONCISE -> isConciseEnabled(type) ? ConfigManager.getConfig().commandConfig.commandVirtualOp : "";
         };
     }
 
     public static int getCommandPermissionLevel(ECommandType type) {
         return switch (type) {
-            case FEED_OTHER, FEED_OTHER_CONCISE -> config.permissionConfig.permissionFeedOther;
-            case TP_COORDINATE, TP_COORDINATE_CONCISE -> config.permissionConfig.permissionTpCoordinate;
-            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> config.permissionConfig.permissionTpStructure;
+            case CARD, CARD_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionSetCard;
+            case FEED_OTHER, FEED_OTHER_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionFeedOther;
+            case TP_COORDINATE, TP_COORDINATE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpCoordinate;
+            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpStructure;
             // case TP_ASK_YES:
             // case TP_ASK_NO:
-            case TP_ASK, TP_ASK_CONCISE ->
+            case TP_ASK, TP_ASK_CANCEL, TP_ASK_CONCISE, TP_ASK_CANCEL_CONCISE ->
                 // case TP_ASK_YES_CONCISE:
                 // case TP_ASK_NO_CONCISE:
-                    config.permissionConfig.permissionTpAsk;
+                    ConfigManager.getConfig().permissionConfig.permissionTpAsk;
             // case TP_HERE_YES:
             // case TP_HERE_NO:
-            case TP_HERE, TP_HERE_CONCISE ->
+            case TP_HERE, TP_HERE_CANCEL, TP_HERE_CONCISE, TP_HERE_CANCEL_CONCISE ->
                 // case TP_HERE_YES_CONCISE:
                 // case TP_HERE_NO_CONCISE:
-                    config.permissionConfig.permissionTpHere;
-            case TP_RANDOM, TP_RANDOM_CONCISE -> config.permissionConfig.permissionTpRandom;
-            case TP_SPAWN, TP_SPAWN_CONCISE -> config.permissionConfig.permissionTpSpawn;
-            case TP_SPAWN_OTHER, TP_SPAWN_OTHER_CONCISE -> config.permissionConfig.permissionTpSpawnOther;
-            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> config.permissionConfig.permissionTpWorldSpawn;
-            case TP_TOP, TP_TOP_CONCISE -> config.permissionConfig.permissionTpTop;
-            case TP_BOTTOM, TP_BOTTOM_CONCISE -> config.permissionConfig.permissionTpBottom;
-            case TP_UP, TP_UP_CONCISE -> config.permissionConfig.permissionTpUp;
-            case TP_DOWN, TP_DOWN_CONCISE -> config.permissionConfig.permissionTpDown;
-            case TP_VIEW, TP_VIEW_CONCISE -> config.permissionConfig.permissionTpView;
+                    ConfigManager.getConfig().permissionConfig.permissionTpHere;
+            case TP_RANDOM, TP_RANDOM_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpRandom;
+            case TP_SPAWN, TP_SPAWN_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpSpawn;
+            case TP_SPAWN_OTHER, TP_SPAWN_OTHER_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpSpawnOther;
+            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpWorldSpawn;
+            case TP_TOP, TP_TOP_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpTop;
+            case TP_BOTTOM, TP_BOTTOM_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpBottom;
+            case TP_UP, TP_UP_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpUp;
+            case TP_DOWN, TP_DOWN_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpDown;
+            case TP_VIEW, TP_VIEW_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpView;
             case TP_HOME, SET_HOME, DEL_HOME, GET_HOME, TP_HOME_CONCISE, SET_HOME_CONCISE, DEL_HOME_CONCISE,
-                 GET_HOME_CONCISE -> config.permissionConfig.permissionTpHome;
-            case TP_STAGE, TP_STAGE_CONCISE -> config.permissionConfig.permissionTpStage;
-            case SET_STAGE, SET_STAGE_CONCISE -> config.permissionConfig.permissionGetStage;
-            case DEL_STAGE, DEL_STAGE_CONCISE -> config.permissionConfig.permissionDelStage;
-            case GET_STAGE, GET_STAGE_CONCISE -> config.permissionConfig.permissionGetStage;
-            case TP_BACK, TP_BACK_CONCISE -> config.permissionConfig.permissionTpBack;
-            case VIRTUAL_OP, VIRTUAL_OP_CONCISE -> config.permissionConfig.permissionVirtualOp;
+                 GET_HOME_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpHome;
+            case TP_STAGE, TP_STAGE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpStage;
+            case SET_STAGE, SET_STAGE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionGetStage;
+            case DEL_STAGE, DEL_STAGE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionDelStage;
+            case GET_STAGE, GET_STAGE_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionGetStage;
+            case TP_BACK, TP_BACK_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionTpBack;
+            case VIRTUAL_OP, VIRTUAL_OP_CONCISE -> ConfigManager.getConfig().permissionConfig.permissionVirtualOp;
             default -> 0;
         };
     }
 
     public static int getCommandPermissionLevel(ETeleportType type) {
         return switch (type) {
-            case TP_COORDINATE -> config.permissionConfig.permissionTpCoordinate;
-            case TP_STRUCTURE -> config.permissionConfig.permissionTpStructure;
-            case TP_ASK -> config.permissionConfig.permissionTpAsk;
-            case TP_HERE -> config.permissionConfig.permissionTpHere;
-            case TP_RANDOM -> config.permissionConfig.permissionTpRandom;
-            case TP_SPAWN -> config.permissionConfig.permissionTpSpawn;
-            case TP_WORLD_SPAWN -> config.permissionConfig.permissionTpWorldSpawn;
-            case TP_TOP -> config.permissionConfig.permissionTpTop;
-            case TP_BOTTOM -> config.permissionConfig.permissionTpBottom;
-            case TP_UP -> config.permissionConfig.permissionTpUp;
-            case TP_DOWN -> config.permissionConfig.permissionTpDown;
-            case TP_VIEW -> config.permissionConfig.permissionTpView;
-            case TP_HOME -> config.permissionConfig.permissionTpHome;
-            case TP_STAGE -> config.permissionConfig.permissionTpStage;
-            case TP_BACK -> config.permissionConfig.permissionTpBack;
+            case TP_COORDINATE -> ConfigManager.getConfig().permissionConfig.permissionTpCoordinate;
+            case TP_STRUCTURE -> ConfigManager.getConfig().permissionConfig.permissionTpStructure;
+            case TP_ASK -> ConfigManager.getConfig().permissionConfig.permissionTpAsk;
+            case TP_HERE -> ConfigManager.getConfig().permissionConfig.permissionTpHere;
+            case TP_RANDOM -> ConfigManager.getConfig().permissionConfig.permissionTpRandom;
+            case TP_SPAWN -> ConfigManager.getConfig().permissionConfig.permissionTpSpawn;
+            case TP_WORLD_SPAWN -> ConfigManager.getConfig().permissionConfig.permissionTpWorldSpawn;
+            case TP_TOP -> ConfigManager.getConfig().permissionConfig.permissionTpTop;
+            case TP_BOTTOM -> ConfigManager.getConfig().permissionConfig.permissionTpBottom;
+            case TP_UP -> ConfigManager.getConfig().permissionConfig.permissionTpUp;
+            case TP_DOWN -> ConfigManager.getConfig().permissionConfig.permissionTpDown;
+            case TP_VIEW -> ConfigManager.getConfig().permissionConfig.permissionTpView;
+            case TP_HOME -> ConfigManager.getConfig().permissionConfig.permissionTpHome;
+            case TP_STAGE -> ConfigManager.getConfig().permissionConfig.permissionTpStage;
+            case TP_BACK -> ConfigManager.getConfig().permissionConfig.permissionTpBack;
             default -> 0;
         };
     }
 
     public static boolean isConciseEnabled(ECommandType type) {
         return switch (type) {
-            case UUID, UUID_CONCISE -> config.conciseConfig.conciseUuid;
-            case DIMENSION, DIMENSION_CONCISE -> config.conciseConfig.conciseDimension;
-            case FEED, FEED_OTHER, FEED_CONCISE, FEED_OTHER_CONCISE -> config.conciseConfig.conciseFeed;
-            case TP_COORDINATE, TP_COORDINATE_CONCISE -> config.conciseConfig.conciseTpCoordinate;
-            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> config.conciseConfig.conciseTpStructure;
-            case TP_ASK, TP_ASK_CONCISE -> config.conciseConfig.conciseTpAsk;
-            case TP_ASK_YES, TP_ASK_YES_CONCISE -> config.conciseConfig.conciseTpAskYes;
-            case TP_ASK_NO, TP_ASK_NO_CONCISE -> config.conciseConfig.conciseTpAskNo;
-            case TP_HERE, TP_HERE_CONCISE -> config.conciseConfig.conciseTpHere;
-            case TP_HERE_YES, TP_HERE_YES_CONCISE -> config.conciseConfig.conciseTpHereYes;
-            case TP_HERE_NO, TP_HERE_NO_CONCISE -> config.conciseConfig.conciseTpHereNo;
-            case TP_RANDOM, TP_RANDOM_CONCISE -> config.conciseConfig.conciseTpRandom;
+            case LANGUAGE, LANGUAGE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseLanguage;
+            case UUID, UUID_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseUuid;
+            case DIMENSION, DIMENSION_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseDimension;
+            case CARD, CARD_CONCISE, SET_CARD, SET_CARD_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseCard;
+            case SHARE, SHARE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseShare;
+            case FEED, FEED_OTHER, FEED_CONCISE, FEED_OTHER_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseFeed;
+            case TP_COORDINATE, TP_COORDINATE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpCoordinate;
+            case TP_STRUCTURE, TP_STRUCTURE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpStructure;
+            case TP_ASK, TP_ASK_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpAsk;
+            case TP_ASK_YES, TP_ASK_YES_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpAskYes;
+            case TP_ASK_NO, TP_ASK_NO_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpAskNo;
+            case TP_ASK_CANCEL, TP_ASK_CANCEL_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpAskCancel;
+            case TP_HERE, TP_HERE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpHere;
+            case TP_HERE_YES, TP_HERE_YES_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpHereYes;
+            case TP_HERE_NO, TP_HERE_NO_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpHereNo;
+            case TP_HERE_CANCEL, TP_HERE_CANCEL_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpHereCancel;
+            case TP_RANDOM, TP_RANDOM_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpRandom;
             case TP_SPAWN, TP_SPAWN_OTHER, TP_SPAWN_CONCISE, TP_SPAWN_OTHER_CONCISE ->
-                    config.conciseConfig.conciseTpSpawn;
-            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> config.conciseConfig.conciseTpWorldSpawn;
-            case TP_TOP, TP_TOP_CONCISE -> config.conciseConfig.conciseTpTop;
-            case TP_BOTTOM, TP_BOTTOM_CONCISE -> config.conciseConfig.conciseTpBottom;
-            case TP_UP, TP_UP_CONCISE -> config.conciseConfig.conciseTpUp;
-            case TP_DOWN, TP_DOWN_CONCISE -> config.conciseConfig.conciseTpDown;
-            case TP_VIEW, TP_VIEW_CONCISE -> config.conciseConfig.conciseTpView;
-            case TP_HOME, TP_HOME_CONCISE -> config.conciseConfig.conciseTpHome;
-            case SET_HOME, SET_HOME_CONCISE -> config.conciseConfig.conciseSetHome;
-            case DEL_HOME, DEL_HOME_CONCISE -> config.conciseConfig.conciseDelHome;
-            case GET_HOME, GET_HOME_CONCISE -> config.conciseConfig.conciseGetHome;
-            case TP_STAGE, TP_STAGE_CONCISE -> config.conciseConfig.conciseTpStage;
-            case SET_STAGE, SET_STAGE_CONCISE -> config.conciseConfig.conciseSetStage;
-            case DEL_STAGE, DEL_STAGE_CONCISE -> config.conciseConfig.conciseDelStage;
-            case GET_STAGE, GET_STAGE_CONCISE -> config.conciseConfig.conciseGetStage;
-            case TP_BACK, TP_BACK_CONCISE -> config.conciseConfig.conciseTpBack;
-            case VIRTUAL_OP, VIRTUAL_OP_CONCISE -> config.conciseConfig.conciseVirtualOp;
+                    ConfigManager.getConfig().conciseConfig.conciseTpSpawn;
+            case TP_WORLD_SPAWN, TP_WORLD_SPAWN_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpWorldSpawn;
+            case TP_TOP, TP_TOP_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpTop;
+            case TP_BOTTOM, TP_BOTTOM_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpBottom;
+            case TP_UP, TP_UP_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpUp;
+            case TP_DOWN, TP_DOWN_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpDown;
+            case TP_VIEW, TP_VIEW_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpView;
+            case TP_HOME, TP_HOME_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpHome;
+            case SET_HOME, SET_HOME_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseSetHome;
+            case DEL_HOME, DEL_HOME_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseDelHome;
+            case GET_HOME, GET_HOME_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseGetHome;
+            case TP_STAGE, TP_STAGE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpStage;
+            case SET_STAGE, SET_STAGE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseSetStage;
+            case DEL_STAGE, DEL_STAGE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseDelStage;
+            case GET_STAGE, GET_STAGE_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseGetStage;
+            case TP_BACK, TP_BACK_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseTpBack;
+            case VIRTUAL_OP, VIRTUAL_OP_CONCISE -> ConfigManager.getConfig().conciseConfig.conciseVirtualOp;
             default -> false;
         };
     }
@@ -361,12 +379,15 @@ public class NarcissusUtils {
     /**
      * 安全的方块
      */
-    private static List<BlockState> SAFE_BLOCKS;
+    private static List<String> SAFE_BLOCKS;
+    private static List<BlockState> SAFE_BLOCKS_STATE;
     /**
      * 不安全的方块
      */
-    private static List<BlockState> UNSAFE_BLOCKS;
-    private static List<BlockState> SUFFOCATING_BLOCKS;
+    private static List<String> UNSAFE_BLOCKS;
+    private static List<BlockState> UNSAFE_BLOCKS_STATE;
+    private static List<String> SUFFOCATING_BLOCKS;
+    private static List<BlockState> SUFFOCATING_BLOCKS_STATE;
 
     /**
      * 初始化方块列表
@@ -375,47 +396,42 @@ public class NarcissusUtils {
         if (SAFE_BLOCKS == null) {
             ServerLevel level = getServerLevel();
             if (level == null) {
+                SAFE_BLOCKS_STATE = new ArrayList<>();
                 SAFE_BLOCKS = new ArrayList<>();
                 UNSAFE_BLOCKS = new ArrayList<>();
                 SUFFOCATING_BLOCKS = new ArrayList<>();
                 return;
             }
 
-            SAFE_BLOCKS = config.safeBlocks.stream()
-                    .map(block -> {
-                        try {
-                            return BlockStateParser.parseForBlock(level.holderLookup(Registries.BLOCK), new StringReader(block), false).blockState();
-                        } catch (CommandSyntaxException e) {
-                            LOGGER.error("Invalid unsafe block: {}", block, e);
-                            return null;
-                        }
-                    })
+            SAFE_BLOCKS_STATE = ConfigManager.getConfig().safeBlocks.stream()
+                    .map(NarcissusUtils::deserializeBlockState)
                     .filter(Objects::nonNull)
                     .distinct()
                     .toList();
 
-            UNSAFE_BLOCKS = config.unsafeBlocks.stream()
-                    .map(block -> {
-                        try {
-                            return BlockStateParser.parseForBlock(level.holderLookup(Registries.BLOCK), new StringReader(block), false).blockState();
-                        } catch (CommandSyntaxException e) {
-                            LOGGER.error("Invalid unsafe block: {}", block, e);
-                            return null;
-                        }
-                    })
+            SAFE_BLOCKS = ConfigManager.getConfig().safeBlocks.stream()
                     .filter(Objects::nonNull)
                     .distinct()
                     .toList();
 
-            SUFFOCATING_BLOCKS = config.suffocatingBlocks.stream()
-                    .map(block -> {
-                        try {
-                            return BlockStateParser.parseForBlock(level.holderLookup(Registries.BLOCK), new StringReader(block), false).blockState();
-                        } catch (CommandSyntaxException e) {
-                            LOGGER.error("Invalid unsafe block: {}", block, e);
-                            return null;
-                        }
-                    })
+            UNSAFE_BLOCKS_STATE = ConfigManager.getConfig().unsafeBlocks.stream()
+                    .map(NarcissusUtils::deserializeBlockState)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+
+            UNSAFE_BLOCKS = ConfigManager.getConfig().unsafeBlocks.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+
+            SUFFOCATING_BLOCKS_STATE = ConfigManager.getConfig().suffocatingBlocks.stream()
+                    .map(NarcissusUtils::deserializeBlockState)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+
+             SUFFOCATING_BLOCKS = ConfigManager.getConfig().suffocatingBlocks.stream()
                     .filter(Objects::nonNull)
                     .distinct()
                     .toList();
@@ -426,30 +442,30 @@ public class NarcissusUtils {
      * 获取安全方块列表
      */
     public static List<BlockState> getSafeBlocks() {
-        if (SAFE_BLOCKS == null) {
+        if (SAFE_BLOCKS_STATE == null) {
             initBlockLists();
         }
-        return SAFE_BLOCKS;
+        return SAFE_BLOCKS_STATE;
     }
 
     /**
      * 获取不安全方块列表
      */
     public static List<BlockState> getUnsafeBlocks() {
-        if (UNSAFE_BLOCKS == null) {
+        if (UNSAFE_BLOCKS_STATE == null) {
             initBlockLists();
         }
-        return UNSAFE_BLOCKS;
+        return UNSAFE_BLOCKS_STATE;
     }
 
     /**
      * 获取窒息方块列表
      */
     public static List<BlockState> getSuffocatingBlocks() {
-        if (SUFFOCATING_BLOCKS == null) {
+        if (SUFFOCATING_BLOCKS_STATE == null) {
             initBlockLists();
         }
-        return SUFFOCATING_BLOCKS;
+        return SUFFOCATING_BLOCKS_STATE;
     }
 
     /**
@@ -626,7 +642,7 @@ public class NarcissusUtils {
 
     private static Coordinate searchForSafeCoordinateInChunk(Level world, Coordinate coordinate, int chunkX, int chunkZ, boolean belowAllowAir) {
         // 搜索安全位置，限制在目标范围区块内
-        int offset = (config.safeChunkRange - 1) * 16;
+        int offset = (ConfigManager.getConfig().safeChunkRange - 1) * 16;
         int chunkMinX = (chunkX << 4) - offset;
         int chunkMinZ = (chunkZ << 4) - offset;
         int chunkMaxX = chunkMinX + 15 + offset;
@@ -693,21 +709,18 @@ public class NarcissusUtils {
         List<Coordinate> list = coordinates.stream().sorted(comparator).toList();
         LOGGER.debug("TimeMillis before searching: {}", System.currentTimeMillis());
         for (Coordinate c : list) {
-            double offsetX = c.getX() >= 0 ? c.getX() + 0.5 : c.getX() - 0.5;
-            double offsetZ = c.getZ() >= 0 ? c.getZ() + 0.5 : c.getZ() - 0.5;
-            Coordinate candidate = new Coordinate().setX(offsetX).setY(c.getY() + 0.15).setZ(offsetZ)
+            Coordinate candidate = new Coordinate().setX(c.getX()).setY(c.getY()).setZ(c.getZ())
                     .setYaw(coordinate.getYaw()).setPitch(coordinate.getPitch())
                     .setDimension(coordinate.getDimension())
                     .setSafe(coordinate.isSafe()).setSafeMode(coordinate.getSafeMode());
             if (belowAllowAir) {
                 if (isAirCoordinate(world, candidate)) {
-                    result = candidate;
+                    result = candidate.addX(0.5).addY(0.15).addZ(0.5);
                     break;
                 }
             } else {
-                initSuffocatingBlocks();
                 if (isSafeCoordinate(world, candidate)) {
-                    result = candidate;
+                    result = candidate.addX(0.5).addY(0.15).addZ(0.5);
                     break;
                 }
             }
@@ -721,17 +734,38 @@ public class NarcissusUtils {
         BlockState block = world.getBlockState(coordinate.toBlockPos());
         BlockState blockAbove = world.getBlockState(coordinate.toBlockPos().above());
         BlockState blockBelow = world.getBlockState(coordinate.toBlockPos().below());
-        initUnsafeBlocks();
-        return isSafeBlock(world, coordinate, true, block, blockAbove, blockBelow);
+        return isSafeBlock(world, coordinate, true
+                , block
+                , blockAbove
+                , blockBelow
+        ) && isSafeBlock(world, coordinate, true
+                , block.getFluidState().createLegacyBlock()
+                , blockAbove.getFluidState().createLegacyBlock()
+                , blockBelow.getFluidState().createLegacyBlock()
+        );
     }
-
     private static boolean isSafeCoordinate(Level world, Coordinate coordinate) {
+        // 确保列表已初始化
+        if (SAFE_BLOCKS_STATE == null || UNSAFE_BLOCKS_STATE == null || SUFFOCATING_BLOCKS_STATE == null) {
+            initBlockLists();
+        }
+
+        // 如果初始化后仍为null，返回默认值
+        if (SAFE_BLOCKS_STATE == null || UNSAFE_BLOCKS_STATE == null || SUFFOCATING_BLOCKS_STATE == null) {
+            return true;
+        }
         BlockState block = world.getBlockState(coordinate.toBlockPos());
         BlockState blockAbove = world.getBlockState(coordinate.toBlockPos().above());
         BlockState blockBelow = world.getBlockState(coordinate.toBlockPos().below());
-        initUnsafeBlocks();
-        initSuffocatingBlocks();
-        return isSafeBlock(world, coordinate, false, block, blockAbove, blockBelow);
+        return isSafeBlock(world, coordinate, false
+                , block
+                , blockAbove
+                , blockBelow
+        ) && isSafeBlock(world, coordinate, true
+                , block.getFluidState().createLegacyBlock()
+                , blockAbove.getFluidState().createLegacyBlock()
+                , blockBelow.getFluidState().createLegacyBlock()
+        );
     }
 
     /**
@@ -742,22 +776,35 @@ public class NarcissusUtils {
      * @param blockBelow 脚下方块
      */
     private static boolean isSafeBlock(Level world, Coordinate coordinate, boolean belowAllowAir, BlockState block, BlockState blockAbove, BlockState blockBelow) {
-        initUnsafeBlocks();
-        initSuffocatingBlocks();
+        // 确保列表已初始化
+        if (UNSAFE_BLOCKS_STATE == null) {
+            initBlockLists();
+        }
+
+        // 如果初始化后仍为null（可能是因为服务器实例不存在），返回默认值
+        if (UNSAFE_BLOCKS_STATE == null) {
+            return true;
+        }
+
         boolean isCurrentPassable = !block.isCollisionShapeFullBlock(world, coordinate.toBlockPos())
-                && !UNSAFE_BLOCKS.contains(block);
+                && !UNSAFE_BLOCKS_STATE.contains(block)
+                && !UNSAFE_BLOCKS.contains(NarcissusUtils.getBlockRegistryName(block));
 
         boolean isHeadSafe = !blockAbove.isSuffocating(world, coordinate.above().toBlockPos())
                 && !blockAbove.isCollisionShapeFullBlock(world, coordinate.above().toBlockPos())
-                && !UNSAFE_BLOCKS.contains(blockAbove)
-                && !SUFFOCATING_BLOCKS.contains(blockAbove);
+                && !UNSAFE_BLOCKS_STATE.contains(blockAbove)
+                && !UNSAFE_BLOCKS.contains(NarcissusUtils.getBlockRegistryName(blockAbove))
+                && !SUFFOCATING_BLOCKS_STATE.contains(blockAbove)
+                && !SUFFOCATING_BLOCKS.contains(NarcissusUtils.getBlockRegistryName(blockAbove));
 
         boolean isBelowValid;
         if (!blockBelow.getFluidState().isEmpty()) {
-            isBelowValid = !UNSAFE_BLOCKS.contains(blockBelow);
+            isBelowValid = !UNSAFE_BLOCKS_STATE.contains(blockBelow)
+                    && !UNSAFE_BLOCKS.contains(NarcissusUtils.getBlockRegistryName(blockBelow));
         } else {
             isBelowValid = blockBelow.isSolidRender(world, coordinate.below().toBlockPos())
-                    && !UNSAFE_BLOCKS.contains(blockBelow);
+                    && !UNSAFE_BLOCKS_STATE.contains(blockBelow)
+                    && !UNSAFE_BLOCKS.contains(NarcissusUtils.getBlockRegistryName(blockBelow));
         }
         if (belowAllowAir) {
             isBelowValid = isBelowValid || blockBelow.is(Blocks.AIR) || blockBelow.is(Blocks.CAVE_AIR);
@@ -767,8 +814,8 @@ public class NarcissusUtils {
     }
 
     private static void initUnsafeBlocks() {
-        if (UNSAFE_BLOCKS == null) {
-            UNSAFE_BLOCKS = new ArrayList<>();
+        if (UNSAFE_BLOCKS_STATE == null) {
+            UNSAFE_BLOCKS_STATE = new ArrayList<>();
 
             // 完全从配置中加载不安全方块
             try {
@@ -777,8 +824,8 @@ public class NarcissusUtils {
                     for (String blockId : config.unsafeBlocks) {
                         try {
                             BlockState block = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), new StringReader(blockId), false).blockState();
-                            if (!UNSAFE_BLOCKS.contains(block)) {
-                                UNSAFE_BLOCKS.add(block);
+                            if (!UNSAFE_BLOCKS_STATE.contains(block)) {
+                                UNSAFE_BLOCKS_STATE.add(block);
                             }
                         } catch (CommandSyntaxException e) {
                             LOGGER.error("Failed to parse unsafe block: " + blockId, e);
@@ -787,14 +834,14 @@ public class NarcissusUtils {
                 } else {
                     // 如果配置为空，添加一些默认值以防止意外
                     LOGGER.warn("No unsafe blocks defined in config, using fallback defaults");
-                    UNSAFE_BLOCKS.add(Blocks.LAVA.defaultBlockState());
-                    UNSAFE_BLOCKS.add(Blocks.FIRE.defaultBlockState());
+                    UNSAFE_BLOCKS_STATE.add(Blocks.LAVA.defaultBlockState());
+                    UNSAFE_BLOCKS_STATE.add(Blocks.FIRE.defaultBlockState());
                 }
             } catch (Exception e) {
                 LOGGER.error("Failed to load unsafe blocks from config", e);
                 // 出错时添加基本的安全保障
-                UNSAFE_BLOCKS.add(Blocks.LAVA.defaultBlockState());
-                UNSAFE_BLOCKS.add(Blocks.FIRE.defaultBlockState());
+                UNSAFE_BLOCKS_STATE.add(Blocks.LAVA.defaultBlockState());
+                UNSAFE_BLOCKS_STATE.add(Blocks.FIRE.defaultBlockState());
             }
         }
     }
@@ -803,8 +850,8 @@ public class NarcissusUtils {
      * Initialize the SUFFOCATING_BLOCKS list if it hasn't been initialized yet
      */
     private static void initSuffocatingBlocks() {
-        if (SUFFOCATING_BLOCKS == null) {
-            SUFFOCATING_BLOCKS = new ArrayList<>();
+        if (SUFFOCATING_BLOCKS_STATE == null) {
+            SUFFOCATING_BLOCKS_STATE = new ArrayList<>();
 
             // 完全从配置中加载窒息方块
             try {
@@ -813,8 +860,8 @@ public class NarcissusUtils {
                     for (String blockId : config.suffocatingBlocks) {
                         try {
                             BlockState block = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), new StringReader(blockId), false).blockState();
-                            if (!SUFFOCATING_BLOCKS.contains(block)) {
-                                SUFFOCATING_BLOCKS.add(block);
+                            if (!SUFFOCATING_BLOCKS_STATE.contains(block)) {
+                                SUFFOCATING_BLOCKS_STATE.add(block);
                             }
                         } catch (CommandSyntaxException e) {
                             LOGGER.error("Failed to parse suffocating block: {}", blockId, e);
@@ -823,14 +870,14 @@ public class NarcissusUtils {
                 } else {
                     // 如果配置为空，添加一些默认值以防止意外
                     LOGGER.warn("No suffocating blocks defined in config, using fallback defaults");
-                    SUFFOCATING_BLOCKS.add(Blocks.LAVA.defaultBlockState());
-                    SUFFOCATING_BLOCKS.add(Blocks.WATER.defaultBlockState());
+                    SUFFOCATING_BLOCKS_STATE.add(Blocks.LAVA.defaultBlockState());
+                    SUFFOCATING_BLOCKS_STATE.add(Blocks.WATER.defaultBlockState());
                 }
             } catch (Exception e) {
                 LOGGER.error("Failed to load suffocating blocks from config", e);
                 // 出错时添加基本的安全保障
-                SUFFOCATING_BLOCKS.add(Blocks.LAVA.defaultBlockState());
-                SUFFOCATING_BLOCKS.add(Blocks.WATER.defaultBlockState());
+                SUFFOCATING_BLOCKS_STATE.add(Blocks.LAVA.defaultBlockState());
+                SUFFOCATING_BLOCKS_STATE.add(Blocks.WATER.defaultBlockState());
             }
         }
     }
@@ -958,6 +1005,17 @@ public class NarcissusUtils {
         return null;
     }
 
+    public static String getHomeDimensionByName(ServerPlayer player, String name) {
+        IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+        List<KeyValue<String, String>> list = data.getHomeCoordinate().keySet().stream()
+                .filter(key -> key.getValue().equals(name))
+                .toList();
+        if (list.size() == 1) {
+            return list.get(0).getKey();
+        }
+        return null;
+    }
+
     public static KeyValue<String, String> getPlayerHomeKey(ServerPlayer player, ResourceKey<Level> dimension, String name) {
         IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
         Map<String, String> defaultHome = data.getDefaultHome();
@@ -1012,6 +1070,18 @@ public class NarcissusUtils {
         return PlayerTeleportDataProvider.getData(player).getHomeCoordinate().getOrDefault(getPlayerHomeKey(player, dimension, name), null);
     }
 
+    public static String getStageDimensionByName(String name) {
+        WorldStageData stageData = WorldStageData.get();
+        List<KeyValue<String, String>> list = stageData.getStageCoordinate().keySet().stream()
+                .filter(key -> key.getValue().equals(name))
+                .toList();
+        if (list.size() == 1) {
+            return list.get(0).getKey();
+        }
+        return null;
+    }
+
+
     /**
      * 获取距离玩家最近的驿站
      *
@@ -1034,7 +1104,7 @@ public class NarcissusUtils {
     }
 
     /**
-     * 获取并移除玩家离开的坐标
+     * 获取玩家离开的坐标
      *
      * @param player    玩家
      * @param type      传送类型
@@ -1046,9 +1116,14 @@ public class NarcissusUtils {
         // 获取玩家的传送数据
         IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
         List<TeleportRecord> records = data.getTeleportRecords();
-        Optional<TeleportRecord> optionalRecord = records.stream()
-                .filter(record -> type == null || record.getTeleportType() == type)
-                .filter(record -> type == ETeleportType.TP_BACK || record.getTeleportType() != ETeleportType.TP_BACK)
+        Stream<TeleportRecord> stream = records.stream()
+                .filter(record -> type == null || record.getTeleportType() == type);
+        for (String s : ConfigManager.getConfig().teleportBackSkipType) {
+            ETeleportType value = ETeleportType.nullableValueOf(s);
+            stream = stream
+                    .filter(record -> type == value || record.getTeleportType() != value);
+        }
+        Optional<TeleportRecord> optionalRecord = stream
                 .filter(record -> dimension == null || record.getBefore().getDimension().equals(dimension))
                 .max(Comparator.comparing(TeleportRecord::getTeleportTime));
         if (optionalRecord.isPresent()) {
@@ -1070,8 +1145,8 @@ public class NarcissusUtils {
      */
     public static int checkRange(ServerPlayer player, ETeleportType type, int range) {
         int maxRange = switch (type) {
-            case TP_VIEW -> config.teleportViewDistanceLimit;
-            default -> config.teleportRandomDistanceLimit;
+            case TP_VIEW -> ConfigManager.getConfig().teleportViewDistanceLimit;
+            default -> ConfigManager.getConfig().teleportRandomDistanceLimit;
         };
         if (range > maxRange) {
             NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "range_too_large"), maxRange);
@@ -1125,16 +1200,16 @@ public class NarcissusUtils {
                         finalAfter = findSafeCoordinate(finalAfter, false);
                         Runnable runnable;
                         // 判断是否需要在脚下放置方块
-                        if (config.setBlockWhenSafeNotFound && !isSafeCoordinate(level, finalAfter)) {
+                        if (ConfigManager.getConfig().setBlockWhenSafeNotFound && !isSafeCoordinate(level, finalAfter)) {
                             BlockState blockState;
                             List<ItemStack> playerItemList = getPlayerItemList(player);
-                            if (CollectionUtils.isNotNullOrEmpty(SAFE_BLOCKS)) {
-                                if (config.getBlockFromInventory) {
-                                    blockState = SAFE_BLOCKS.stream()
+                            if (CollectionUtils.isNotNullOrEmpty(SAFE_BLOCKS_STATE)) {
+                                if (ConfigManager.getConfig().getBlockFromInventory) {
+                                    blockState = SAFE_BLOCKS_STATE.stream()
                                             .filter(block -> playerItemList.stream().map(ItemStack::getItem).anyMatch(item -> new ItemStack(block.getBlock()).getItem().equals(item)))
                                             .findFirst().orElse(null);
                                 } else {
-                                    blockState = SAFE_BLOCKS.get(0);
+                                    blockState = SAFE_BLOCKS_STATE.get(0);
                                 }
                             } else {
                                 blockState = null;
@@ -1178,7 +1253,7 @@ public class NarcissusUtils {
     }
 
     private static void teleportPlayer(@NonNull ServerPlayer player, @NonNull Coordinate after, ETeleportType type, Coordinate before, ServerLevel level) {
-        ResourceLocation sound = new ResourceLocation(config.tpSound);
+        ResourceLocation sound = new ResourceLocation(ConfigManager.getConfig().tpSound);
         NarcissusUtils.playSound(player, sound, 1.0f, 1.0f);
         after.setY(Math.floor(after.getY()) + 0.1);
 
@@ -1214,7 +1289,7 @@ public class NarcissusUtils {
      * @return 玩家的坐骑
      */
     private static @Nullable Entity teleportPassengers(ServerPlayer player, Entity parent, Entity passenger, @NonNull Coordinate coordinate, ServerLevel level) {
-        if (!config.tpWithVehicle || passenger == null) return null;
+        if (!ConfigManager.getConfig().tpWithVehicle || passenger == null) return null;
 
         Entity playerVehicle = null;
         List<Entity> passengers = new ArrayList<>(passenger.getPassengers());
@@ -1258,9 +1333,9 @@ public class NarcissusUtils {
      * 传送跟随的实体
      */
     private static void teleportFollowers(@NonNull ServerPlayer player, @NonNull Coordinate coordinate, ServerLevel level) {
-        if (!config.tpWithFollower) return;
+        if (!ConfigManager.getConfig().tpWithFollower) return;
 
-        int followerRange = config.tpWithFollowerRange;
+        int followerRange = ConfigManager.getConfig().tpWithFollowerRange;
 
         // 传送主动跟随的实体
         for (TamableAnimal entity : player.level().getEntitiesOfClass(TamableAnimal.class, player.getBoundingBox().inflate(followerRange))) {
@@ -1508,11 +1583,12 @@ public class NarcissusUtils {
             } catch (CommandSyntaxException ignored) {
             }
         } else if (success) {
-            source.sendSuccess(() -> Component.translatable(key, args).setLanguageCode(NarcissusFarewell.DEFAULT_LANGUAGE).toChatComponent(), false);
+            source.sendSuccess(() -> Component.translatable(key, args).setLanguageCode(ConfigManager.getConfig().defaultLanguage).toChatComponent(), false);
         } else {
-            source.sendFailure(Component.translatable(key, args).setLanguageCode(NarcissusFarewell.DEFAULT_LANGUAGE).toChatComponent());
+            source.sendFailure(Component.translatable(key, args).setLanguageCode(ConfigManager.getConfig().defaultLanguage).toChatComponent());
         }
     }
+
 
     /**
      * 广播数据包至所有玩家
@@ -1530,7 +1606,7 @@ public class NarcissusUtils {
     public static boolean isTeleportAcrossDimensionEnabled(ServerPlayer player, ResourceKey<Level> to, ETeleportType type) {
         boolean result = true;
         if (player.level().dimension() != to) {
-            if (config.teleportAcrossDimension) {
+            if (ConfigManager.getConfig().teleportAcrossDimension) {
                 if (!NarcissusUtils.isTeleportTypeAcrossDimensionEnabled(player, type)) {
                     result = false;
                     NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "across_dimension_not_enable_for"), getCommand(type));
@@ -1548,16 +1624,16 @@ public class NarcissusUtils {
      */
     public static boolean isTeleportTypeAcrossDimensionEnabled(ServerPlayer player, ETeleportType type) {
         int permission = switch (type) {
-            case TP_COORDINATE -> config.permissionConfig.permissionTpCoordinateAcrossDimension;
-            case TP_STRUCTURE -> config.permissionConfig.permissionTpStructureAcrossDimension;
-            case TP_ASK -> config.permissionConfig.permissionTpAskAcrossDimension;
-            case TP_HERE -> config.permissionConfig.permissionTpHereAcrossDimension;
-            case TP_RANDOM -> config.permissionConfig.permissionTpRandomAcrossDimension;
-            case TP_SPAWN -> config.permissionConfig.permissionTpSpawnAcrossDimension;
-            case TP_WORLD_SPAWN -> config.permissionConfig.permissionTpWorldSpawnAcrossDimension;   
-            case TP_HOME -> config.permissionConfig.permissionTpHomeAcrossDimension;
-            case TP_STAGE -> config.permissionConfig.permissionTpStageAcrossDimension;
-            case TP_BACK -> config.permissionConfig.permissionTpBackAcrossDimension;
+            case TP_COORDINATE -> ConfigManager.getConfig().permissionConfig.permissionTpCoordinateAcrossDimension;
+            case TP_STRUCTURE -> ConfigManager.getConfig().permissionConfig.permissionTpStructureAcrossDimension;
+            case TP_ASK -> ConfigManager.getConfig().permissionConfig.permissionTpAskAcrossDimension;
+            case TP_HERE -> ConfigManager.getConfig().permissionConfig.permissionTpHereAcrossDimension;
+            case TP_RANDOM -> ConfigManager.getConfig().permissionConfig.permissionTpRandomAcrossDimension;
+            case TP_SPAWN -> ConfigManager.getConfig().permissionConfig.permissionTpSpawnAcrossDimension;
+            case TP_WORLD_SPAWN -> ConfigManager.getConfig().permissionConfig.permissionTpWorldSpawnAcrossDimension;
+            case TP_HOME -> ConfigManager.getConfig().permissionConfig.permissionTpHomeAcrossDimension;
+            case TP_STAGE -> ConfigManager.getConfig().permissionConfig.permissionTpStageAcrossDimension;
+            case TP_BACK -> ConfigManager.getConfig().permissionConfig.permissionTpBackAcrossDimension;
             default -> 0;
         };
         return permission > -1 && player.hasPermissions(permission);
@@ -1575,7 +1651,7 @@ public class NarcissusUtils {
      */
     public static int getTeleportCoolDown(ServerPlayer player, ETeleportType type) {
         // 如果传送卡类型为抵消冷却时间，则不计算冷却时间
-        if (config.teleportCardType == ECardType.REFUND_COOLDOWN || config.teleportCardType == ECardType.REFUND_ALL_COST_AND_COOLDOWN) {
+        if (ConfigManager.getConfig().teleportCardType == ECardType.REFUND_COOLDOWN || ConfigManager.getConfig().teleportCardType == ECardType.REFUND_ALL_COST_AND_COOLDOWN) {
             if (PlayerTeleportDataProvider.getData(player).getTeleportCard() > 0) {
                 return 0;
             }
@@ -1586,13 +1662,13 @@ public class NarcissusUtils {
                 .map(TeleportRecord::getTeleportTime)
                 .max(Comparator.comparing(Date::toInstant))
                 .orElse(new Date(0)).toInstant();
-        switch (config.teleportRequestCooldownType) {
+        switch (ConfigManager.getConfig().teleportRequestCooldownType) {
             case COMMON:
-                return calculateCooldown(player.getUUID(), current, lastTpTime, config.teleportRequestCooldown, null);
+                return calculateCooldown(player.getUUID(), current, lastTpTime, ConfigManager.getConfig().teleportRequestCooldown, null);
             case INDIVIDUAL:
                 return calculateCooldown(player.getUUID(), current, lastTpTime, commandCoolDown, type);
             case MIXED:
-                int globalCommandCoolDown = config.teleportRequestCooldown;
+                int globalCommandCoolDown = ConfigManager.getConfig().teleportRequestCooldown;
                 int individualCooldown = calculateCooldown(player.getUUID(), current, lastTpTime, commandCoolDown, type);
                 int globalCooldown = calculateCooldown(player.getUUID(), current, lastTpTime, globalCommandCoolDown, null);
                 return Math.max(individualCooldown, globalCooldown);
@@ -1608,21 +1684,21 @@ public class NarcissusUtils {
      */
     public static int getCommandCoolDown(ETeleportType type) {
         return switch (type) {
-            case TP_COORDINATE -> config.cooldownConfig.cooldownTpCoordinate;
-            case TP_STRUCTURE -> config.cooldownConfig.cooldownTpStructure;
-            case TP_ASK -> config.cooldownConfig.cooldownTpAsk;
-            case TP_HERE -> config.cooldownConfig.cooldownTpHere;
-            case TP_RANDOM -> config.cooldownConfig.cooldownTpRandom;
-            case TP_SPAWN -> config.cooldownConfig.cooldownTpSpawn;
-            case TP_WORLD_SPAWN -> config.cooldownConfig.cooldownTpWorldSpawn;
-            case TP_TOP -> config.cooldownConfig.cooldownTpTop;
-            case TP_BOTTOM -> config.cooldownConfig.cooldownTpBottom;
-            case TP_UP -> config.cooldownConfig.cooldownTpUp;
-            case TP_DOWN -> config.cooldownConfig.cooldownTpDown;
-            case TP_VIEW -> config.cooldownConfig.cooldownTpView;
-            case TP_HOME -> config.cooldownConfig.cooldownTpHome;
-            case TP_STAGE -> config.cooldownConfig.cooldownTpStage;
-            case TP_BACK -> config.cooldownConfig.cooldownTpBack;
+            case TP_COORDINATE -> ConfigManager.getConfig().cooldownConfig.cooldownTpCoordinate;
+            case TP_STRUCTURE -> ConfigManager.getConfig().cooldownConfig.cooldownTpStructure;
+            case TP_ASK -> ConfigManager.getConfig().cooldownConfig.cooldownTpAsk;
+            case TP_HERE -> ConfigManager.getConfig().cooldownConfig.cooldownTpHere;
+            case TP_RANDOM -> ConfigManager.getConfig().cooldownConfig.cooldownTpRandom;
+            case TP_SPAWN -> ConfigManager.getConfig().cooldownConfig.cooldownTpSpawn;
+            case TP_WORLD_SPAWN -> ConfigManager.getConfig().cooldownConfig.cooldownTpWorldSpawn;
+            case TP_TOP -> ConfigManager.getConfig().cooldownConfig.cooldownTpTop;
+            case TP_BOTTOM -> ConfigManager.getConfig().cooldownConfig.cooldownTpBottom;
+            case TP_UP -> ConfigManager.getConfig().cooldownConfig.cooldownTpUp;
+            case TP_DOWN -> ConfigManager.getConfig().cooldownConfig.cooldownTpDown;
+            case TP_VIEW -> ConfigManager.getConfig().cooldownConfig.cooldownTpView;
+            case TP_HOME -> ConfigManager.getConfig().cooldownConfig.cooldownTpHome;
+            case TP_STAGE -> ConfigManager.getConfig().cooldownConfig.cooldownTpStage;
+            case TP_BACK -> ConfigManager.getConfig().cooldownConfig.cooldownTpBack;
             default -> 0;
         };
     }
@@ -1683,9 +1759,9 @@ public class NarcissusUtils {
 
         double adjustedDistance;
         if (player.level().dimension() == targetDim) {
-            adjustedDistance = Math.min(config.teleportCostDistanceLimit, distance);
+            adjustedDistance = Math.min(ConfigManager.getConfig().teleportCostDistanceLimit, distance);
         } else {
-            adjustedDistance = config.teleportCostDistanceAcrossDimension;
+            adjustedDistance = ConfigManager.getConfig().teleportCostDistanceAcrossDimension;
         }
 
         double need = cost.getNum() * adjustedDistance * cost.getRate();
@@ -1776,9 +1852,9 @@ public class NarcissusUtils {
      */
     public static int getTeleportCostNeedPost(ServerPlayer player, double need) {
         int ceil = (int) Math.ceil(need);
-        if (!config.teleportCard) return ceil;
+        if (!ConfigManager.getConfig().teleportCard) return ceil;
         IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
-        return switch (config.teleportCardType) {
+        return switch (ConfigManager.getConfig().teleportCardType) {
             case NONE -> data.getTeleportCard() > 0 ? ceil : -1;
             case LIKE_COST -> data.getTeleportCard() >= ceil ? ceil : -1;
             case REFUND_COST, REFUND_COST_AND_COOLDOWN -> Math.max(0, ceil - data.getTeleportCard());
@@ -1792,8 +1868,8 @@ public class NarcissusUtils {
      */
     public static int getTeleportCardNeedPre(double need) {
         int ceil = (int) Math.ceil(need);
-        if (!config.teleportCard) return 0;
-        return switch (config.teleportCardType) {
+        if (!ConfigManager.getConfig().teleportCard) return 0;
+        return switch (ConfigManager.getConfig().teleportCardType) {
             case LIKE_COST -> ceil;
             default -> 1;
         };
@@ -1804,9 +1880,9 @@ public class NarcissusUtils {
      */
     public static int getTeleportCardNeedPost(ServerPlayer player, double need) {
         int ceil = (int) Math.ceil(need);
-        if (!config.teleportCard) return 0;
+        if (!ConfigManager.getConfig().teleportCard) return 0;
         IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
-        return switch (config.teleportCardType) {
+        return switch (ConfigManager.getConfig().teleportCardType) {
             case NONE -> data.getTeleportCard() > 0 ? 0 : 1;
             case LIKE_COST -> Math.max(0, ceil - data.getTeleportCard());
             default -> 0;
@@ -1817,94 +1893,94 @@ public class NarcissusUtils {
         TeleportCost cost = new TeleportCost();
         switch (type) {
             case TP_COORDINATE:
-                cost.setType(config.costConfig.costTpCoordinateType);
-                cost.setNum(config.costConfig.costTpCoordinateNum);
-                cost.setRate(config.costConfig.costTpCoordinateRate);
-                cost.setConf(config.costConfig.costTpCoordinateConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpCoordinateType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpCoordinateNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpCoordinateRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpCoordinateConf);
                 break;
             case TP_STRUCTURE:
-                cost.setType(config.costConfig.costTpStructureType);
-                cost.setNum(config.costConfig.costTpStructureNum);
-                cost.setRate(config.costConfig.costTpStructureRate);
-                cost.setConf(config.costConfig.costTpStructureConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpStructureType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpStructureNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpStructureRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpStructureConf);
                 break;
             case TP_ASK:
-                cost.setType(config.costConfig.costTpAskType);
-                cost.setNum(config.costConfig.costTpAskNum);
-                cost.setRate(config.costConfig.costTpAskRate);
-                cost.setConf(config.costConfig.costTpAskConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpAskType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpAskNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpAskRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpAskConf);
                 break;
             case TP_HERE:
-                cost.setType(config.costConfig.costTpHereType);
-                cost.setNum(config.costConfig.costTpHereNum);
-                cost.setRate(config.costConfig.costTpHereRate);
-                cost.setConf(config.costConfig.costTpHereConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpHereType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpHereNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpHereRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpHereConf);
                 break;
             case TP_RANDOM:
-                cost.setType(config.costConfig.costTpRandomType);
-                cost.setNum(config.costConfig.costTpRandomNum);
-                cost.setRate(config.costConfig.costTpRandomRate);
-                cost.setConf(config.costConfig.costTpRandomConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpRandomType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpRandomNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpRandomRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpRandomConf);
                 break;
             case TP_SPAWN:
-                cost.setType(config.costConfig.costTpSpawnType);
-                cost.setNum(config.costConfig.costTpSpawnNum);
-                cost.setRate(config.costConfig.costTpSpawnRate);
-                cost.setConf(config.costConfig.costTpSpawnConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpSpawnType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpSpawnNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpSpawnRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpSpawnConf);
                 break;
             case TP_WORLD_SPAWN:
-                cost.setType(config.costConfig.costTpWorldSpawnType);
-                cost.setNum(config.costConfig.costTpWorldSpawnNum);
-                cost.setRate(config.costConfig.costTpWorldSpawnRate);
-                cost.setConf(config.costConfig.costTpWorldSpawnConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpWorldSpawnType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpWorldSpawnNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpWorldSpawnRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpWorldSpawnConf);
                 break;
             case TP_TOP:
-                cost.setType(config.costConfig.costTpTopType);
-                cost.setNum(config.costConfig.costTpTopNum);
-                cost.setRate(config.costConfig.costTpTopRate);
-                cost.setConf(config.costConfig.costTpTopConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpTopType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpTopNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpTopRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpTopConf);
                 break;
             case TP_BOTTOM:
-                cost.setType(config.costConfig.costTpBottomType);
-                cost.setNum(config.costConfig.costTpBottomNum);
-                cost.setRate(config.costConfig.costTpBottomRate);
-                cost.setConf(config.costConfig.costTpBottomConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpBottomType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpBottomNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpBottomRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpBottomConf);
                 break;
             case TP_UP:
-                cost.setType(config.costConfig.costTpUpType);
-                cost.setNum(config.costConfig.costTpUpNum);
-                cost.setRate(config.costConfig.costTpUpRate);
-                cost.setConf(config.costConfig.costTpUpConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpUpType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpUpNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpUpRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpUpConf);
                 break;
             case TP_DOWN:
-                cost.setType(config.costConfig.costTpDownType);
-                cost.setNum(config.costConfig.costTpDownNum);
-                cost.setRate(config.costConfig.costTpDownRate);
-                cost.setConf(config.costConfig.costTpDownConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpDownType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpDownNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpDownRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpDownConf);
                 break;
             case TP_VIEW:
-                cost.setType(config.costConfig.costTpViewType);
-                cost.setNum(config.costConfig.costTpViewNum);
-                cost.setRate(config.costConfig.costTpViewRate);
-                cost.setConf(config.costConfig.costTpViewConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpViewType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpViewNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpViewRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpViewConf);
                 break;
             case TP_HOME:
-                cost.setType(config.costConfig.costTpHomeType);
-                cost.setNum(config.costConfig.costTpHomeNum);
-                cost.setRate(config.costConfig.costTpHomeRate);
-                cost.setConf(config.costConfig.costTpHomeConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpHomeType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpHomeNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpHomeRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpHomeConf);
                 break;
             case TP_STAGE:
-                cost.setType(config.costConfig.costTpStageType);
-                cost.setNum(config.costConfig.costTpStageNum);
-                cost.setRate(config.costConfig.costTpStageRate);
-                cost.setConf(config.costConfig.costTpStageConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpStageType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpStageNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpStageRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpStageConf);
                 break;
             case TP_BACK:
-                cost.setType(config.costConfig.costTpBackType);
-                cost.setNum(config.costConfig.costTpBackNum);
-                cost.setRate(config.costConfig.costTpBackRate);
-                cost.setConf(config.costConfig.costTpBackConf);
+                cost.setType(ConfigManager.getConfig().costConfig.costTpBackType);
+                cost.setNum(ConfigManager.getConfig().costConfig.costTpBackNum);
+                cost.setRate(ConfigManager.getConfig().costConfig.costTpBackRate);
+                cost.setConf(ConfigManager.getConfig().costConfig.costTpBackConf);
                 break;
             default:
                 break;
@@ -1943,6 +2019,30 @@ public class NarcissusUtils {
      * @return 玩家的语言设置
      */
     public static String getPlayerLanguage(Player player) {
+        try {
+            return PlayerTeleportDataProvider.getData(player).getValidLanguage(player);
+        } catch (IllegalArgumentException i) {
+            return ConfigManager.getConfig().defaultLanguage;
+        }
+    }
+
+    public static String getValidLanguage(@Nullable Player player, @Nullable String language) {
+        String result;
+        if (StringUtils.isNullOrEmptyEx(language) || "client".equalsIgnoreCase(language)) {
+            if (player instanceof ServerPlayer) {
+                result = NarcissusUtils.getServerPlayerLanguage((ServerPlayer) player);
+            } else {
+                result = NarcissusUtils.getClientLanguage();
+            }
+        } else if ("server".equalsIgnoreCase(language)) {
+            result = ConfigManager.getConfig().defaultLanguage;
+        } else {
+            result = language;
+        }
+        return result;
+    }
+
+    public static String getServerPlayerLanguage(ServerPlayer player) {
         return NarcissusFarewell.getPlayerLanguage(player);
     }
 
@@ -1953,8 +2053,9 @@ public class NarcissusUtils {
      * @param targetPlayer   目标玩家
      */
     public static void clonePlayerLanguage(ServerPlayer originalPlayer, ServerPlayer targetPlayer) {
-        FieldUtils.setPrivateFieldValue(ServerPlayer.class, targetPlayer, FieldUtils.getPlayerLanguageFieldName(originalPlayer), getPlayerLanguage(originalPlayer));
+        FieldUtils.setPrivateFieldValue(ServerPlayer.class, targetPlayer, FieldUtils.getPlayerLanguageFieldName(originalPlayer), getServerPlayerLanguage(originalPlayer));
     }
+
 
     public static String getClientLanguage() {
         return Minecraft.getInstance().getLanguageManager().getSelected();
@@ -2027,6 +2128,49 @@ public class NarcissusUtils {
         if (soundEvent != null) {
             player.playNotifySound(soundEvent, SoundSource.PLAYERS, volume, pitch);
         }
+    }
+
+    /**
+     * 序列化方块默认状态
+     */
+    public static String serializeBlockState(Block block) {
+        return serializeBlockState(block.defaultBlockState());
+    }
+
+    /**
+     * 序列化方块状态
+     */
+    public static String serializeBlockState(BlockState blockState) {
+        return BlockStateParser.serialize(blockState);
+    }
+
+    /**
+     * 反序列化方块状态
+     */
+    public static BlockState deserializeBlockState(String block) {
+        try {
+            return BlockStateParser.parseForBlock(getServerLevel().holderLookup(Registries.BLOCK), new StringReader(block), false).blockState();
+        } catch (Exception e) {
+            LOGGER.error("Invalid unsafe block: {}", block, e);
+            return null;
+        }
+    }
+
+    /**
+     * 获取方块注册ID
+     */
+    @NonNull
+    public static String getBlockRegistryName(BlockState blockState) {
+        return getBlockRegistryName(blockState.getBlock());
+    }
+
+    /**
+     * 获取方块注册ID
+     */
+    @NonNull
+    public static String getBlockRegistryName(Block block) {
+        Optional<ResourceKey<Block>> key = block.defaultBlockState().getBlockHolder().unwrapKey();
+        return key.map(blockResourceKey -> blockResourceKey.location().toString()).orElse("");
     }
 
     /**

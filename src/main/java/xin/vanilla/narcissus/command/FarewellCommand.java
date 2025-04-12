@@ -8,8 +8,6 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.context.ParsedCommandNode;
-import com.mojang.brigadier.context.StringRange;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.shedaniel.autoconfig.AutoConfig;
@@ -29,20 +27,18 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.phys.Vec3;
 import xin.vanilla.narcissus.NarcissusFarewell;
-import xin.vanilla.narcissus.config.ServerConfig;
+import xin.vanilla.narcissus.config.*;
 import xin.vanilla.narcissus.data.TeleportRecord;
 import xin.vanilla.narcissus.data.player.IPlayerTeleportData;
 import xin.vanilla.narcissus.data.player.PlayerTeleportDataProvider;
 import xin.vanilla.narcissus.data.world.WorldStageData;
-import xin.vanilla.narcissus.config.Coordinate;
-import xin.vanilla.narcissus.config.KeyValue;
-import xin.vanilla.narcissus.config.TeleportRequest;
 import xin.vanilla.narcissus.enums.*;
 import xin.vanilla.narcissus.util.Component;
 import xin.vanilla.narcissus.util.*;
@@ -52,11 +48,8 @@ import java.util.List;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static xin.vanilla.narcissus.config.ConfigManager.config;
 
 public class FarewellCommand {
-
-    public static int HELP_INFO_NUM_PER_PAGE = 5;
 
     // 延迟初始化帮助消息，避免在静态初始化时访问服务器实例
     public static List<KeyValue<String, ECommandType>> helpMessage;
@@ -117,10 +110,10 @@ public class FarewellCommand {
             Component helpInfo;
             if (page > 0) {
                 List<KeyValue<String, ECommandType>> helpMessage = getHelpMessage();
-                int pages = (int) Math.ceil((double) helpMessage.size() / HELP_INFO_NUM_PER_PAGE);
-                helpInfo = Component.literal(StringUtils.format(config.helpHeader + "\n", page, pages));
-                for (int i = 0; (page - 1) * HELP_INFO_NUM_PER_PAGE + i < helpMessage.size() && i < HELP_INFO_NUM_PER_PAGE; i++) {
-                    KeyValue<String, ECommandType> keyValue = helpMessage.get((page - 1) * HELP_INFO_NUM_PER_PAGE + i);
+                int pages = (int) Math.ceil((double) helpMessage.size() / ConfigManager.getConfig().helpInfoNumPerPage);
+                helpInfo = Component.literal(StringUtils.format(ConfigManager.getConfig().helpHeader + "\n", page, pages));
+                for (int i = 0; (page - 1) * ConfigManager.getConfig().helpInfoNumPerPage + i < helpMessage.size() && i < ConfigManager.getConfig().helpInfoNumPerPage; i++) {
+                    KeyValue<String, ECommandType> keyValue = helpMessage.get((page - 1) * ConfigManager.getConfig().helpInfoNumPerPage + i);
                     Component commandTips;
                     if (keyValue.getValue().name().toLowerCase().contains("concise")) {
                         commandTips = Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.COMMAND, "concise", NarcissusUtils.getCommand(keyValue.getValue().replaceConcise()));
@@ -131,7 +124,7 @@ public class FarewellCommand {
                     helpInfo.append("/").append(keyValue.getKey())
                             .append(new Component(" -> ").setColor(Color.YELLOW.getRGB()))
                             .append(commandTips);
-                    if ((page - 1) * HELP_INFO_NUM_PER_PAGE + i < helpMessage.size() - 1 && i < HELP_INFO_NUM_PER_PAGE - 1) {
+                    if ((page - 1) * ConfigManager.getConfig().helpInfoNumPerPage + i < helpMessage.size() - 1 && i < ConfigManager.getConfig().helpInfoNumPerPage - 1) {
                         helpInfo.append("\n");
                     }
                 }
@@ -139,27 +132,34 @@ public class FarewellCommand {
                 // 添加翻页按钮
                 if (pages > 1) {
                     helpInfo.append("\n");
+                    Component prevButton = Component.literal("<<< ");
                     if (page > 1) {
-                        Component prevButton = Component.literal("<<< ")
-                                .setColor(new Color(0, 170, 170).getRGB())
+                        prevButton.setColor(EMCColor.AQUA.getColor())
                                 .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
                                         String.format("/%s %s %d", NarcissusUtils.getCommandPrefix(), "help", page - 1)))
                                 .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                         Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "previous_page").toTextComponent()));
-                        helpInfo.append(prevButton);
+                    } else {
+                        prevButton.setColor(EMCColor.DARK_AQUA.getColor());
                     }
+                    helpInfo.append(prevButton);
 
-                    helpInfo.append(Component.literal(String.format(" %d/%d ", page, pages)).setColor(Color.WHITE.getRGB()));
+                    helpInfo.append(Component.literal(String.format(" %s/%s "
+                                    , StringUtils.padOptimizedLeft(page, String.valueOf(pages).length(), " ")
+                                    , pages))
+                            .setColor(EMCColor.WHITE.getColor()));
 
+                    Component nextButton = Component.literal(" >>>");
                     if (page < pages) {
-                        Component nextButton = Component.literal(" >>>")
-                                .setColor(new Color(0, 170, 170).getRGB())
+                        nextButton.setColor(EMCColor.AQUA.getColor())
                                 .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
                                         String.format("/%s %s %d", NarcissusUtils.getCommandPrefix(), "help", page + 1)))
                                 .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                         Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "next_page").toTextComponent()));
-                        helpInfo.append(nextButton);
+                    } else {
+                        nextButton.setColor(EMCColor.DARK_AQUA.getColor());
                     }
+                    helpInfo.append(nextButton);
                 }
             } else {
                 ECommandType type = ECommandType.valueOf(command);
@@ -173,13 +173,9 @@ public class FarewellCommand {
         };
 
         SuggestionProvider<CommandSourceStack> helpSuggestions = (context, builder) -> {
-            StringRange stringRange = context.getNodes().stream()
-                    .filter(o -> o.getNode().getName().equalsIgnoreCase("command"))
-                    .map(ParsedCommandNode::getRange)
-                    .findFirst().orElse(new StringRange(0, 0));
-            String input = context.getInput().substring(stringRange.getStart(), stringRange.getEnd());
+            String input = getStringEmpty(context, "command");
             boolean isInputEmpty = StringUtils.isNullOrEmpty(input);
-            int totalPages = (int) Math.ceil((double) getHelpMessage().size() / HELP_INFO_NUM_PER_PAGE);
+            int totalPages = (int) Math.ceil((double) getHelpMessage().size() / ConfigManager.getConfig().helpInfoNumPerPage);
             for (int i = 0; i < totalPages && isInputEmpty; i++) {
                 builder.suggest(i + 1);
             }
@@ -187,7 +183,7 @@ public class FarewellCommand {
                     .filter(type -> type != ECommandType.HELP)
                     .filter(type -> !type.isIgnore())
                     .filter(type -> !type.name().toLowerCase().contains("concise"))
-                    .filter(type -> isInputEmpty || type.name().contains(input))
+                    .filter(type -> isInputEmpty || type.name().toLowerCase().contains(input.toLowerCase()))
                     .sorted(Comparator.comparing(ECommandType::getSort))
                     .toList()) {
                 builder.suggest(type.name());
@@ -211,7 +207,7 @@ public class FarewellCommand {
         SuggestionProvider<CommandSourceStack> rangeSuggestions = (context, builder) -> {
             for (int i = 1; i <= 5; i++) {
                 int index = (int) Math.pow(10, i);
-                if (index <= config.teleportRandomDistanceLimit) {
+                if (index <= ConfigManager.getConfig().teleportRandomDistanceLimit) {
                     builder.suggest(index);
                 }
             }
@@ -219,11 +215,7 @@ public class FarewellCommand {
         };
 
         SuggestionProvider<CommandSourceStack> structureSuggestions = (context, builder) -> {
-            StringRange stringRange = context.getNodes().stream()
-                    .filter(o -> o.getNode().getName().equalsIgnoreCase("struct"))
-                    .map(ParsedCommandNode::getRange)
-                    .findFirst().orElse(new StringRange(0, 0));
-            String input = context.getInput().substring(stringRange.getStart(), stringRange.getEnd());
+            String input = getStringEmpty(context, "rules");
             List<String> structures = NarcissusUtils.getStructureNames(); // 使用延迟加载的方法
             for (String structure : structures) {
                 if (StringUtils.isNullOrEmpty(input) || structure.contains(input)) {
@@ -237,7 +229,7 @@ public class FarewellCommand {
             ServerPlayer player = context.getSource().getPlayerOrException();
             IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
             for (KeyValue<String, String> key : data.getHomeCoordinate().keySet()) {
-                builder.suggest(key.getValue());
+                builder.suggest(StringUtils.formatString(key.getValue()));
             }
             return builder.buildFuture();
         };
@@ -245,12 +237,30 @@ public class FarewellCommand {
         SuggestionProvider<CommandSourceStack> stageSuggestions = (context, builder) -> {
             ServerLevel level = context.getSource().getLevel();
             for (KeyValue<String, String> key : WorldStageData.getStageCoordinates(level).keySet()) {
-                builder.suggest(key.getValue());
+                builder.suggest(StringUtils.formatString(key.getValue()));
             }
             return builder.buildFuture();
         };
 
+        Command<CommandSourceStack> languageCommand = context -> {
+            ServerPlayer player = context.getSource().getPlayerOrException();
+            IPlayerTeleportData signInData = PlayerTeleportDataProvider.getData(player);
+            String language = StringArgumentType.getString(context, "language");
+            if (I18nUtils.getI18nFiles().contains(language)) {
+                signInData.setLanguage(language);
+                NarcissusUtils.sendMessage(player, Component.translatable(player, EI18nType.MESSAGE, "player_default_language", language));
+            } else if ("server".equalsIgnoreCase(language) || "client".equalsIgnoreCase(language)) {
+                signInData.setLanguage(language);
+                NarcissusUtils.sendMessage(player, Component.translatable(player, EI18nType.MESSAGE, "player_default_language", language));
+            } else {
+                NarcissusUtils.sendMessage(player, Component.translatable(player, EI18nType.MESSAGE, "language_not_exist").setColor(0xFFFF0000));
+            }
+            return 1;
+        };
+
+
         Command<CommandSourceStack> dimCommand = (context) -> {
+            notifyHelp(context);
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.DIMENSION)) return 0;
             ServerPlayer player = context.getSource().getPlayerOrException();
@@ -265,6 +275,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> uuidCommand = (context) -> {
+            notifyHelp(context);
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.UUID)) return 0;
             CommandSourceStack source = context.getSource();
@@ -282,18 +293,191 @@ public class FarewellCommand {
             if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
                 language = NarcissusUtils.getPlayerLanguage(source.getPlayerOrException());
             } else {
-                language = NarcissusFarewell.DEFAULT_LANGUAGE;
+                language = ConfigManager.getConfig().defaultLanguage;
             }
             Component uuid = Component.literal(target.getStringUUID());
             uuid.setColor(EMCColor.GREEN.getColor())
                     .setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, target.getStringUUID()))
                     .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable(language, EI18nType.MESSAGE, "chat_copy_click").toTextComponent()));
-            Component component = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "player_uuid", target.getDisplayName().getString(), uuid);
+            Component component = Component.translatable(language, EI18nType.MESSAGE, "player_uuid", target.getDisplayName().getString(), uuid);
             source.sendSuccess(() -> component.toChatComponent(language), false);
             return 1;
         };
 
+        Command<CommandSourceStack> cardCommand = (context) -> {
+            notifyHelp(context);
+            // 传送功能前置校验
+            if (checkTeleportPre(context.getSource(), ECommandType.CARD)) return 0;
+            CommandSourceStack source = context.getSource();
+            String type = getStringDefault(context, "type", "get");
+            ServerPlayer target;
+            try {
+                target = EntityArgument.getPlayer(context, "player");
+            } catch (IllegalArgumentException ignored) {
+                if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
+                    target = source.getPlayerOrException();
+                } else {
+                    throw CommandSourceStack.ERROR_NOT_PLAYER.create();
+                }
+            }
+            int num = 0;
+            try {
+                num = IntegerArgumentType.getInteger(context, "num");
+            } catch (IllegalArgumentException ignored) {
+            }
+
+            String language;
+            if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
+                language = NarcissusUtils.getPlayerLanguage(source.getPlayerOrException());
+            } else {
+                language = ConfigManager.getConfig().defaultLanguage;
+            }
+            IPlayerTeleportData data = PlayerTeleportDataProvider.getData(target);
+            switch (type) {
+                case "set":
+                    data.setTeleportCard(num);
+                    break;
+                case "add":
+                    data.plusTeleportCard(num);
+                    break;
+                case "get":
+                    break;
+                default:
+                    throw new IllegalArgumentException("Type " + type + " is not supported");
+            }
+            Component component = Component.translatable(language, EI18nType.MESSAGE, "player_card"
+                    , target.getDisplayName().getString()
+                    , data.getTeleportCard());
+            source.sendSuccess(() -> component.toChatComponent(language), false);
+            return 1;
+        };
+
+        Command<CommandSourceStack> shareCommand = (context) -> {
+            notifyHelp(context);
+            // 传送功能前置校验
+            if (checkTeleportPre(context.getSource(), ECommandType.SHARE)) return 0;
+            CommandSourceStack source = context.getSource();
+            ServerPlayer player = source.getPlayerOrException();
+
+            String name = getStringDefault(context, "name", "Shared");
+
+            List<ServerPlayer> targetList;
+            try {
+                targetList = new ArrayList<>(EntityArgument.getPlayers(context, "player"));
+            } catch (IllegalArgumentException ignored) {
+                targetList = new ArrayList<>(context.getSource().getServer().getPlayerList().getPlayers());
+            }
+
+            Component nameComponent;
+            Component tpButton = Component.translatable(EI18nType.MESSAGE, "tp_button");
+            // Component addButton = Component.translatable(EI18nType.MESSAGE, "add_button");
+            Component copyButton = Component.translatable(EI18nType.MESSAGE, "copy_button");
+
+            // 若为home
+            if (name.contains("->")) {
+                IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                KeyValue<String, Coordinate> keyValue = data.getHomeCoordinate().entrySet().stream()
+                        .map(entry -> new KeyValue<>(entry.getKey().getValue() + "->" + entry.getKey().getKey(), entry.getValue()))
+                        .filter(kv -> name.equals(kv.getKey()))
+                        .findFirst()
+                        .orElse(new KeyValue<>(name, null));
+                String[] split = keyValue.getKey().split("->");
+                Coordinate coordinate = keyValue.getValue();
+                if (coordinate == null) {
+                    NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "home_not_found_with_name_in_dimension")
+                            , split[1], split[0]);
+                    return 0;
+                }
+                nameComponent = Component.literal(split[0]);
+
+                String tpCommand = String.format("/%s %s %s %s unsafe %s"
+                        , NarcissusUtils.getCommand(ECommandType.TP_COORDINATE)
+                        , coordinate.toXString()
+                        , coordinate.toYString()
+                        , coordinate.toZString()
+                        , coordinate.getDimensionResourceId()
+                );
+                tpButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+                copyButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+
+            }
+            // 若为stage
+            else if (name.contains(">>")) {
+                KeyValue<String, Coordinate> keyValue = WorldStageData.get().getStageCoordinate().entrySet().stream()
+                        .map(entry -> new KeyValue<>(entry.getKey().getValue() + ">>" + entry.getKey().getKey(), entry.getValue()))
+                        .filter(kv -> name.equals(kv.getKey()))
+                        .findFirst()
+                        .orElse(new KeyValue<>(name, null));
+                String[] split = keyValue.getKey().split(">>");
+                Coordinate coordinate = keyValue.getValue();
+                if (coordinate == null) {
+                    NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "stage_not_found_with_name_in_dimension")
+                            , split[1], split[0]);
+                    return 0;
+                }
+                nameComponent = Component.literal(split[0]);
+
+                String tpCommand = String.format("/%s %s %s %s unsafe %s"
+                        , NarcissusUtils.getCommand(ECommandType.TP_COORDINATE)
+                        , coordinate.toXString()
+                        , coordinate.toYString()
+                        , coordinate.toZString()
+                        , coordinate.getDimensionResourceId()
+                );
+                tpButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+                copyButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+            }
+            // 玩家当前坐标
+            else {
+                nameComponent = Component.literal(name);
+                Coordinate coordinate = new Coordinate(player);
+
+                String tpCommand = String.format("/%s %s %s %s unsafe %s"
+                        , NarcissusUtils.getCommand(ECommandType.TP_COORDINATE)
+                        , coordinate.toXString()
+                        , coordinate.toYString()
+                        , coordinate.toZString()
+                        , coordinate.getDimensionResourceId()
+                );
+                tpButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+                copyButton.setColor(EMCColor.GREEN.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, tpCommand))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(tpCommand).toTextComponent()));
+            }
+
+            String lang;
+            if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
+                lang = NarcissusUtils.getPlayerLanguage(source.getPlayerOrException());
+            } else {
+                lang = ConfigManager.getConfig().defaultLanguage;
+            }
+            Component component = Component.translatable(lang, EI18nType.MESSAGE, "shared_coordinates"
+                    , player.getDisplayName().getString()
+                    , nameComponent
+                    , tpButton
+                    // , addButton
+                    , copyButton);
+            for (ServerPlayer target : targetList) {
+                if (!target.getUUID().equals(player.getUUID())) {
+                    NarcissusUtils.sendMessage(target, component);
+                }
+            }
+            source.sendSuccess(() -> component.toChatComponent(lang), false);
+            return 1;
+        };
+
         Command<CommandSourceStack> feedCommand = (context) -> {
+            notifyHelp(context);
             CommandSourceStack source = context.getSource();
             // 传送功能前置校验
             if (checkTeleportPre(source, ECommandType.FEED)) return 0;
@@ -314,7 +498,7 @@ public class FarewellCommand {
             else if (source.getEntity() instanceof ServerPlayer) {
                 ServerPlayer player = source.getPlayerOrException();
                 // 判断是否开启功能
-                if (!config.switchConfig.switchFeed) {
+                if (!ConfigManager.getConfig().switchConfig.switchFeed) {
                     NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "command_disabled"));
                     return 0;
                 }
@@ -334,12 +518,13 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpCoordinateCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_COORDINATE)) return 0;
             Coordinate coordinate;
             try {
-                Vec3 pos = Vec3Argument.getVec3(context, "coordinate");
+                Vec3 pos = Vec3Argument.getCoordinates(context, "coordinate").getPosition(context.getSource());
                 ResourceKey<Level> targetLevel;
                 try {
                     targetLevel = DimensionArgument.getDimension(context, "dimension").dimension();
@@ -351,10 +536,7 @@ public class FarewellCommand {
                 ServerPlayer target = EntityArgument.getPlayer(context, "player");
                 coordinate = new Coordinate(target.getX(), target.getY(), target.getZ(), target.getYRot(), target.getXRot(), target.level().dimension());
             }
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-            }
+                coordinate.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_COORDINATE, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_COORDINATE);
@@ -362,6 +544,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpStructureCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_STRUCTURE)) return 0;
@@ -388,7 +571,7 @@ public class FarewellCommand {
             try {
                 range = IntegerArgumentType.getInteger(context, "range");
             } catch (IllegalArgumentException ignored) {
-                range = config.teleportRandomDistanceLimit;
+                range = ConfigManager.getConfig().teleportRandomDistanceLimit;
             }
             range = NarcissusUtils.checkRange(player, ETeleportType.TP_STRUCTURE, range);
             try {
@@ -412,10 +595,7 @@ public class FarewellCommand {
                     NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "structure_biome_not_found_in_range"), structId);
                     return;
                 }
-                try {
-                    coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-                } catch (IllegalArgumentException ignored) {
-                }
+                coordinate.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
                 // 验证传送代价
                 if (checkTeleportPost(player, coordinate, ETeleportType.TP_STRUCTURE, true)) return;
                 player.server.submit(() -> NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_STRUCTURE));
@@ -424,6 +604,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpAskCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_ASK)) return 0;
@@ -455,10 +636,7 @@ public class FarewellCommand {
                     .setTarget(target)
                     .setTeleportType(ETeleportType.TP_ASK)
                     .setRequestTime(new Date());
-            try {
-                request.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-            }
+            request.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
             if (checkTeleportPost(request)) return 0;
             NarcissusFarewell.getTeleportRequest().put(request.getRequestId(), request);
 
@@ -466,26 +644,32 @@ public class FarewellCommand {
             {
                 // 创建 "Yes" 按钮
                 Component yesButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "yes_button", NarcissusUtils.getPlayerLanguage(target))
-                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), config.commandConfig.commandTpAskYes, request.getRequestId())));
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpAskYes, request.getRequestId())));
                 // 创建 "No" 按钮
                 Component noButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "no_button", NarcissusUtils.getPlayerLanguage(target))
-                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), config.commandConfig.commandTpAskNo, request.getRequestId())));
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpAskNo, request.getRequestId())));
                 Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "tp_ask_request_received"
                         , player.getDisplayName().getString(), yesButton, noButton);
                 NarcissusUtils.sendMessage(target, msg);
             }
             // 通知请求者
             {
-                NarcissusUtils.sendMessage(player, Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "tp_ask_request_sent", target.getDisplayName().getString()));
+                // 创建 "Cancel" 按钮
+                Component cancelButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "cancel_button", NarcissusUtils.getPlayerLanguage(target))
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpAskCancel, request.getRequestId())));
+                Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "tp_ask_request_sent"
+                        , target.getDisplayName().getString(), cancelButton);
+                NarcissusUtils.sendMessage(player, msg);
             }
             return 1;
         };
 
         Command<CommandSourceStack> tpAskYesCommand = context -> {
+            notifyHelp(context);
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_ASK_YES)) return 0;
             ServerPlayer player = context.getSource().getPlayerOrException();
-            String id = getRequestId(context, ETeleportType.TP_ASK);
+            String id = getRequestId(context, ETeleportType.TP_ASK, true);
             if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_ask_not_found"));
                 return 0;
@@ -500,10 +684,11 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpAskNoCommand = context -> {
+            notifyHelp(context);
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_ASK_NO)) return 0;
             ServerPlayer player = context.getSource().getPlayerOrException();
-            String id = getRequestId(context, ETeleportType.TP_ASK);
+            String id = getRequestId(context, ETeleportType.TP_ASK, true);
             if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_ask_not_found"));
                 return 0;
@@ -513,7 +698,28 @@ public class FarewellCommand {
             return 1;
         };
 
+
+        Command<CommandSourceStack> tpAskCancelCommand = context -> {
+            notifyHelp(context);
+            // 传送功能前置校验
+            if (checkTeleportPre(context.getSource(), ECommandType.TP_ASK_CANCEL)) return 0;
+            ServerPlayer player = context.getSource().getPlayerOrException();
+            String id = getRequestId(context, ETeleportType.TP_ASK, false);
+            if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
+                NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_ask_not_found"));
+                return 0;
+            }
+            TeleportRequest request = NarcissusFarewell.getTeleportRequest().remove(id);
+            NarcissusUtils.sendTranslatableMessage(request.getRequester(), I18nUtils.getKey(EI18nType.MESSAGE, "tp_ask_cancelled"), request.getRequester().getDisplayName().getString());
+            if (!request.getRequester().getUUID().equals(request.getTarget().getUUID())) {
+                NarcissusUtils.sendTranslatableMessage(request.getTarget(), I18nUtils.getKey(EI18nType.MESSAGE, "tp_ask_cancelled"), request.getRequester().getDisplayName().getString());
+            }
+            return 1;
+        };
+
+
         Command<CommandSourceStack> tpHereCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_HERE)) return 0;
@@ -545,10 +751,7 @@ public class FarewellCommand {
                     .setTarget(target)
                     .setTeleportType(ETeleportType.TP_HERE)
                     .setRequestTime(new Date());
-            try {
-                request.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-            }
+            request.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
             if (checkTeleportPost(request)) return 0;
             NarcissusFarewell.getTeleportRequest().put(request.getRequestId(), request);
 
@@ -556,26 +759,32 @@ public class FarewellCommand {
             {
                 // 创建 "Yes" 按钮
                 Component yesButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "yes_button", NarcissusUtils.getPlayerLanguage(target))
-                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), config.commandConfig.commandTpHereYes, request.getRequestId())));
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpHereYes, request.getRequestId())));
                 // 创建 "No" 按钮
                 Component noButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "no_button", NarcissusUtils.getPlayerLanguage(target))
-                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), config.commandConfig.commandTpHereNo, request.getRequestId())));
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpHereNo, request.getRequestId())));
                 Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "tp_here_request_received"
                         , player.getDisplayName().getString(), Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.WORD, request.isSafe() ? "tp_here_safe" : "tp_here_unsafe"), yesButton, noButton);
                 NarcissusUtils.sendMessage(target, msg);
             }
             // 通知请求者
             {
-                NarcissusUtils.sendMessage(player, Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "tp_here_request_sent", target.getDisplayName().getString()));
+                // 创建 "Cancel" 按钮
+                Component cancelButton = Component.translatable(NarcissusUtils.getPlayerLanguage(target), EI18nType.MESSAGE, "cancel_button", NarcissusUtils.getPlayerLanguage(target))
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, String.format("/%s %s %s", NarcissusUtils.getCommandPrefix(), ConfigManager.getConfig().commandConfig.commandTpHereCancel, request.getRequestId())));
+                Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "tp_here_request_sent"
+                        , target.getDisplayName().getString(), cancelButton);
+                NarcissusUtils.sendMessage(player, msg);
             }
             return 1;
         };
 
         Command<CommandSourceStack> tpHereYesCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_HERE_YES)) return 0;
-            String id = getRequestId(context, ETeleportType.TP_HERE);
+            String id = getRequestId(context, ETeleportType.TP_HERE, true);
             if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_here_not_found"));
                 return 0;
@@ -590,10 +799,11 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpHereNoCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_HERE_YES)) return 0;
-            String id = getRequestId(context, ETeleportType.TP_HERE);
+            String id = getRequestId(context, ETeleportType.TP_HERE, true);
             if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_here_not_found"));
                 return 0;
@@ -603,7 +813,27 @@ public class FarewellCommand {
             return 1;
         };
 
+        Command<CommandSourceStack> tpHereCancelCommand = context -> {
+            notifyHelp(context);
+            // 传送功能前置校验
+            if (checkTeleportPre(context.getSource(), ECommandType.TP_HERE_CANCEL)) return 0;
+            ServerPlayer player = context.getSource().getPlayerOrException();
+            String id = getRequestId(context, ETeleportType.TP_HERE, false);
+            if (StringUtils.isNullOrEmpty(id) || !NarcissusFarewell.getTeleportRequest().containsKey(id)) {
+                NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_here_not_found"));
+                return 0;
+            }
+            TeleportRequest request = NarcissusFarewell.getTeleportRequest().remove(id);
+            NarcissusUtils.sendTranslatableMessage(request.getRequester(), I18nUtils.getKey(EI18nType.MESSAGE, "tp_here_cancelled"), request.getRequester().getDisplayName().getString());
+            if (!request.getRequester().getUUID().equals(request.getTarget().getUUID())) {
+                NarcissusUtils.sendTranslatableMessage(request.getTarget(), I18nUtils.getKey(EI18nType.MESSAGE, "tp_here_cancelled"), request.getRequester().getDisplayName().getString());
+            }
+            return 1;
+        };
+
+
         Command<CommandSourceStack> tpRandomCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_RANDOM)) return 0;
@@ -612,7 +842,7 @@ public class FarewellCommand {
             try {
                 range = IntegerArgumentType.getInteger(context, "range");
             } catch (IllegalArgumentException ignored) {
-                range = config.teleportRandomDistanceLimit;
+                range = ConfigManager.getConfig().teleportRandomDistanceLimit;
             }
             range = NarcissusUtils.checkRange(player, ETeleportType.TP_RANDOM, range);
             try {
@@ -628,6 +858,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpSpawnCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_SPAWN)) return 0;
@@ -649,11 +880,7 @@ public class FarewellCommand {
                 coordinate.setDimension(Level.OVERWORLD);
             }
             coordinate.fromBlockPos(respawnPosition);
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-                coordinate.setSafe(true);
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe")));
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_SPAWN, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_SPAWN);
@@ -661,6 +888,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpWorldSpawnCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_WORLD_SPAWN)) return 0;
@@ -672,11 +900,7 @@ public class FarewellCommand {
                 coordinate.setDimension(Level.OVERWORLD);
             }
             coordinate.fromBlockPos(respawnPosition);
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-                coordinate.setSafe(true);
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe")));
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_WORLD_SPAWN, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_WORLD_SPAWN);
@@ -684,6 +908,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpTopCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_TOP)) return 0;
@@ -692,11 +917,7 @@ public class FarewellCommand {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_top_not_found"));
                 return 0;
             }
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe"))).setSafeMode(ESafeMode.Y_DOWN);
-            } catch (IllegalArgumentException ignored) {
-                coordinate.setSafe(true).setSafeMode(ESafeMode.Y_DOWN);
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe"))).setSafeMode(ESafeMode.Y_DOWN);
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_TOP, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_TOP);
@@ -704,6 +925,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpBottomCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_BOTTOM)) return 0;
@@ -712,11 +934,7 @@ public class FarewellCommand {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "tp_bottom_not_found"));
                 return 0;
             }
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe"))).setSafeMode(ESafeMode.Y_UP);
-            } catch (IllegalArgumentException ignored) {
-                coordinate.setSafe(true).setSafeMode(ESafeMode.Y_UP);
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe"))).setSafeMode(ESafeMode.Y_UP);
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_BOTTOM, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_BOTTOM);
@@ -724,6 +942,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpUpCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_UP)) return 0;
@@ -733,7 +952,7 @@ public class FarewellCommand {
                 return 0;
             }
             try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe"))).setSafeMode(ESafeMode.Y_UP);
+                coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe"))).setSafeMode(ESafeMode.Y_UP);
             } catch (IllegalArgumentException ignored) {
                 coordinate.setSafe(true).setSafeMode(ESafeMode.Y_UP);
             }
@@ -744,6 +963,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpDownCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_DOWN)) return 0;
@@ -753,7 +973,7 @@ public class FarewellCommand {
                 return 0;
             }
             try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe"))).setSafeMode(ESafeMode.Y_DOWN);
+                coordinate.setSafe("safe".equalsIgnoreCase(getStringDefault(context, "safe", "safe"))).setSafeMode(ESafeMode.Y_DOWN);
             } catch (IllegalArgumentException ignored) {
                 coordinate.setSafe(true).setSafeMode(ESafeMode.Y_DOWN);
             }
@@ -764,19 +984,20 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpViewCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_VIEW)) return 0;
             boolean safe = true;
             int range;
             try {
-                safe = "safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe"));
+                safe = "safe".equalsIgnoreCase(getStringEmpty(context, "safe"));
             } catch (IllegalArgumentException ignored) {
             }
             try {
                 range = IntegerArgumentType.getInteger(context, "range");
             } catch (IllegalArgumentException ignored) {
-                range = config.teleportViewDistanceLimit;
+                range = ConfigManager.getConfig().teleportViewDistanceLimit;
             }
             range = NarcissusUtils.checkRange(player, ETeleportType.TP_VIEW, range);
             player.displayClientMessage(Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.MESSAGE, "tp_view_searching").toTextComponent(), true);
@@ -797,11 +1018,11 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpHomeCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_HOME)) return 0;
             ResourceKey<Level> targetLevel = null;
-            String name = null;
             try {
                 ResourceKey<Level> targetDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(StringArgumentType.getString(context, "dimension")));
                 ServerLevel level = context.getSource().getServer().getLevel(targetDimension);
@@ -810,10 +1031,7 @@ public class FarewellCommand {
                 }
             } catch (IllegalArgumentException ignored) {
             }
-            try {
-                name = StringArgumentType.getString(context, "name");
-            } catch (IllegalArgumentException ignored) {
-            }
+            String name = getStringDefault(context, "name", null);
             Coordinate coordinate = NarcissusUtils.getPlayerHome(player, targetLevel, name);
             if (coordinate == null) {
                 if (targetLevel == null && name == null) {
@@ -838,21 +1056,17 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> setHomeCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.SET_HOME)) return 0;
             // 判断设置数量是否超过限制
             IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
-            if (data.getHomeCoordinate().size() >= config.teleportHomeLimit) {
-                NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "home_limit"), config.teleportHomeLimit);
+            if (data.getHomeCoordinate().size() >= ConfigManager.getConfig().teleportHomeLimit) {
+                NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "home_limit"), ConfigManager.getConfig().teleportHomeLimit);
                 return 0;
             }
-            String name;
-            try {
-                name = StringArgumentType.getString(context, "name");
-            } catch (IllegalArgumentException ignored) {
-                name = "home";
-            }
+            String name = getStringDefault(context, "name", "home");
             boolean defaultHome = false;
             try {
                 defaultHome = BoolArgumentType.getBool(context, "default");
@@ -878,13 +1092,19 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> delHomeCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.DEL_HOME)) return 0;
             IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
             String name = StringArgumentType.getString(context, "name");
-            ResourceKey<Level> targetLevel = DimensionArgument.getDimension(context, "dimension").dimension();
-            String dimension = targetLevel.location().toString();
+            String dimension;
+            try {
+                ResourceKey<Level> targetLevel = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(StringArgumentType.getString(context, "dimension")));
+                dimension = targetLevel.location().toString();
+            } catch (IllegalArgumentException ignored) {
+                dimension = NarcissusUtils.getHomeDimensionByName(player, name);
+            }
             Coordinate remove = data.getHomeCoordinate().remove(new KeyValue<>(dimension, name));
             if (remove == null) {
                 NarcissusUtils.sendTranslatableMessage(player, I18nUtils.getKey(EI18nType.MESSAGE, "home_not_found_with_name_in_dimension"), dimension, name);
@@ -901,6 +1121,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> getHomeCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.GET_HOME)) return 0;
@@ -960,17 +1181,18 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpStageCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_STAGE)) return 0;
             ResourceKey<Level> targetLevel = null;
-            String name = null;
+            String name = getStringDefault(context, "name", null);
             try {
-                name = StringArgumentType.getString(context, "name");
-            } catch (IllegalArgumentException ignored) {
-            }
-            try {
-                targetLevel = DimensionArgument.getDimension(context, "dimension").dimension();
+                ResourceKey<Level> targetDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(StringArgumentType.getString(context, "dimension")));
+                ServerLevel level = context.getSource().getServer().getLevel(targetDimension);
+                if (level != null) {
+                    targetLevel = targetDimension;
+                }
             } catch (IllegalArgumentException ignored) {
             }
             String dimension = targetLevel != null ? targetLevel.location().toString() : null;
@@ -1003,10 +1225,7 @@ public class FarewellCommand {
                     return 0;
                 }
             }
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_STAGE, true)) return 0;
             NarcissusUtils.teleportTo(player, coordinate, ETeleportType.TP_STAGE);
@@ -1014,6 +1233,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> setStageCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.SET_STAGE)) return 0;
@@ -1042,14 +1262,19 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> delStageCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.DEL_STAGE)) return 0;
             String name = StringArgumentType.getString(context, "name");
-            ServerLevel targetLevel = DimensionArgument.getDimension(context, "dimension");
-            ResourceKey<Level> targetLevelKey = targetLevel.dimension();
-            WorldStageData stageData = WorldStageData.get(targetLevel);
-            String dimension = targetLevelKey.location().toString();
+            String dimension;
+            try {
+                ResourceKey<Level> targetLevel = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(StringArgumentType.getString(context, "dimension")));
+                dimension = targetLevel.location().toString();
+            } catch (IllegalArgumentException ignored) {
+                dimension = NarcissusUtils.getStageDimensionByName(name);
+            }
+            WorldStageData stageData = WorldStageData.get(player.serverLevel());
             Coordinate remove = stageData.getStageCoordinate().remove(new KeyValue<>(dimension, name));
             stageData.setDirty();
             if (remove == null) {
@@ -1061,6 +1286,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> getStageCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.GET_STAGE)) return 0;
@@ -1111,17 +1337,18 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> tpBackCommand = context -> {
+            notifyHelp(context);
             ServerPlayer player = context.getSource().getPlayerOrException();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.TP_BACK)) return 0;
-            ETeleportType type = null;
+            ETeleportType type = ETeleportType.nullableValueOf(getStringEmpty(context, "type"));
+            ResourceKey<Level> targetLevel = null;
             try {
-                type = ETeleportType.valueOf(StringArgumentType.getString(context, "type"));
-            } catch (IllegalArgumentException ignored) {
-            }
-            ResourceKey<Level> targetLevel;
-            try {
-                targetLevel = DimensionArgument.getDimension(context, "dimension").dimension();
+                ResourceKey<Level> targetDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(StringArgumentType.getString(context, "dimension")));
+                ServerLevel level = context.getSource().getServer().getLevel(targetDimension);
+                if (level != null) {
+                    targetLevel = targetDimension;
+                }
             } catch (IllegalArgumentException ignored) {
                 // targetLevel = player.getLevel().dimension();
                 targetLevel = null;
@@ -1132,10 +1359,7 @@ public class FarewellCommand {
                 return 0;
             }
             Coordinate coordinate = record.getBefore().clone();
-            try {
-                coordinate.setSafe("safe".equalsIgnoreCase(StringArgumentType.getString(context, "safe")));
-            } catch (IllegalArgumentException ignored) {
-            }
+            coordinate.setSafe("safe".equalsIgnoreCase(getStringEmpty(context, "safe")));
             // 验证传送代价
             if (checkTeleportPost(player, coordinate, ETeleportType.TP_BACK, true)) return 0;
             NarcissusUtils.removeBackTeleportRecord(player, record);
@@ -1144,6 +1368,7 @@ public class FarewellCommand {
         };
 
         Command<CommandSourceStack> virtualOpCommand = context -> {
+            notifyHelp(context);
             CommandSourceStack source = context.getSource();
             // 传送功能前置校验
             if (checkTeleportPre(context.getSource(), ECommandType.VIRTUAL_OP)) return 0;
@@ -1169,7 +1394,7 @@ public class FarewellCommand {
                 if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
                     language = NarcissusUtils.getPlayerLanguage(source.getPlayerOrException());
                 } else {
-                    language = NarcissusFarewell.DEFAULT_LANGUAGE;
+                    language = ConfigManager.getConfig().defaultLanguage;
                 }
                 for (ServerPlayer target : targetList) {
                     switch (type) {
@@ -1204,20 +1429,88 @@ public class FarewellCommand {
             return 1;
         };
 
-        LiteralArgumentBuilder<CommandSourceStack> dim = Commands.literal(config.commandConfig.commandDimension)
+        LiteralArgumentBuilder<CommandSourceStack> language = Commands.literal(ConfigManager.getConfig().commandConfig.commandLanguage)
+                // 设置语言 /narcissus language
+                .then(Commands.argument("language", StringArgumentType.word())
+                        .suggests((context, builder) -> {
+                            builder.suggest("client");
+                            builder.suggest("server");
+                            I18nUtils.getI18nFiles().forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
+                        .executes(languageCommand)
+                );
+        LiteralArgumentBuilder<CommandSourceStack> dim = Commands.literal(ConfigManager.getConfig().commandConfig.commandDimension)
                 .executes(dimCommand);
-        LiteralArgumentBuilder<CommandSourceStack> uuid = Commands.literal(config.commandConfig.commandUuid)
+        LiteralArgumentBuilder<CommandSourceStack> uuid = Commands.literal(ConfigManager.getConfig().commandConfig.commandUuid)
                 .executes(uuidCommand)
                 .then(Commands.argument("player", EntityArgument.player())
                         .executes(uuidCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> feed = Commands.literal(config.commandConfig.commandFeed)
+        LiteralArgumentBuilder<CommandSourceStack> card = Commands.literal(ConfigManager.getConfig().commandConfig.commandCard)
+                .executes(cardCommand)
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.SET_CARD))
+                        .suggests((context, builder) -> {
+                            builder.suggest("get");
+                            builder.suggest("add");
+                            builder.suggest("set");
+                            return builder.buildFuture();
+                        })
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(cardCommand)
+                                .then(Commands.argument("num", IntegerArgumentType.integer())
+                                        .suggests((context, builder) -> {
+                                            builder.suggest(-5);
+                                            builder.suggest(-1);
+                                            builder.suggest(1);
+                                            builder.suggest(5);
+                                            builder.suggest(10);
+                                            builder.suggest(20);
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(cardCommand)
+                                )
+                        )
+                );
+        LiteralArgumentBuilder<CommandSourceStack> share = Commands.literal(ConfigManager.getConfig().commandConfig.commandShare)
+                .executes(shareCommand)
+                .then(Commands.argument("name", StringArgumentType.string())
+                        .suggests((context, builder) -> {
+                            String name = getStringEmpty(context, "name");
+                            CommandSourceStack source = context.getSource();
+                            ServerPlayer player = source.getPlayerOrException();
+                            // 获取玩家私人传送点
+                            IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                            for (KeyValue<String, String> home : data.getHomeCoordinate().keySet()) {
+                                // -> 用于标识home，方便shareCommand中识别
+                                String homeString = home.getValue() + "->" + home.getKey();
+                                if (StringUtils.isNullOrEmptyEx(name) || homeString.toLowerCase().contains(name)) {
+                                    builder.suggest(StringUtils.formatString(homeString));
+                                }
+                            }
+                            // 获取公共传送点
+                            for (KeyValue<String, String> stage : WorldStageData.get().getStageCoordinate().keySet()) {
+                                // >> 用于标识stage，方便shareCommand中识别
+                                String stageString = stage.getValue() + ">>" + stage.getKey();
+                                if (StringUtils.isNullOrEmptyEx(name) || stageString.toLowerCase().contains(name)) {
+                                    builder.suggest(StringUtils.formatString(stageString));
+                                }
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(shareCommand)
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(shareCommand)
+                        )
+                );
+        LiteralArgumentBuilder<CommandSourceStack> feed = Commands.literal(ConfigManager.getConfig().commandConfig.commandFeed)
                 .executes(feedCommand)
                 .then(Commands.argument("player", EntityArgument.players())
                         .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.FEED_OTHER))
                         .executes(feedCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpx = Commands.literal(config.commandConfig.commandTpCoordinate)
+        LiteralArgumentBuilder<CommandSourceStack> tpx = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpCoordinate)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_COORDINATE))
                 .then(Commands.argument("coordinate", Vec3Argument.vec3())
                         .executes(tpCoordinateCommand)
@@ -1236,7 +1529,7 @@ public class FarewellCommand {
                                 .executes(tpCoordinateCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpst = Commands.literal(config.commandConfig.commandTpStructure)
+        LiteralArgumentBuilder<CommandSourceStack> tpst = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpStructure)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_STRUCTURE))
                 .then(Commands.argument("struct", ResourceLocationArgument.id())
                         .suggests(structureSuggestions)
@@ -1249,7 +1542,7 @@ public class FarewellCommand {
                                 )
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpa = Commands.literal(config.commandConfig.commandTpAsk)
+        LiteralArgumentBuilder<CommandSourceStack> tpa = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpAsk)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_ASK))
                 .executes(tpAskCommand)
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1259,11 +1552,11 @@ public class FarewellCommand {
                                 .executes(tpAskCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpaYes = Commands.literal(config.commandConfig.commandTpAskYes)
+        LiteralArgumentBuilder<CommandSourceStack> tpaYes = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpAskYes)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_ASK_YES))
                 .executes(tpAskYesCommand)
                 .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
-                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_ASK))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_ASK, true))
                         .executes(tpAskYesCommand)
                 )
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1272,11 +1565,11 @@ public class FarewellCommand {
                 .then(Commands.argument("requestId", StringArgumentType.word())
                         .executes(tpAskYesCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpaNo = Commands.literal(config.commandConfig.commandTpAskNo)
+        LiteralArgumentBuilder<CommandSourceStack> tpaNo = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpAskNo)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_ASK_NO))
                 .executes(tpAskNoCommand)
                 .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
-                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_ASK))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_ASK, true))
                         .executes(tpAskNoCommand)
                 )
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1285,7 +1578,22 @@ public class FarewellCommand {
                 .then(Commands.argument("requestId", StringArgumentType.word())
                         .executes(tpAskNoCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tph = Commands.literal(config.commandConfig.commandTpHere)
+
+        LiteralArgumentBuilder<CommandSourceStack> tpaCancel = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpAskCancel)
+                .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_ASK_CANCEL))
+                .executes(tpAskCancelCommand)
+                .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_ASK, false))
+                        .executes(tpAskCancelCommand)
+                )
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(tpAskCancelCommand)
+                )
+                .then(Commands.argument("requestId", StringArgumentType.word())
+                        .executes(tpAskCancelCommand)
+                );
+
+        LiteralArgumentBuilder<CommandSourceStack> tph = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpHere)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HERE))
                 .executes(tpHereCommand)
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1295,11 +1603,11 @@ public class FarewellCommand {
                                 .executes(tpHereCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tphYes = Commands.literal(config.commandConfig.commandTpHereYes)
+        LiteralArgumentBuilder<CommandSourceStack> tphYes = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpHereYes)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HERE_YES))
                 .executes(tpHereYesCommand)
                 .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
-                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_HERE))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_HERE, true))
                         .executes(tpHereYesCommand)
                 )
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1308,11 +1616,11 @@ public class FarewellCommand {
                 .then(Commands.argument("requestId", StringArgumentType.word())
                         .executes(tpHereYesCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tphNo = Commands.literal(config.commandConfig.commandTpHereNo)
+        LiteralArgumentBuilder<CommandSourceStack> tphNo = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpHereNo)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HERE_NO))
                 .executes(tpHereNoCommand)
                 .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
-                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_HERE))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_HERE, true))
                         .executes(tpHereNoCommand)
                 )
                 .then(Commands.argument("player", EntityArgument.player())
@@ -1321,7 +1629,20 @@ public class FarewellCommand {
                 .then(Commands.argument("requestId", StringArgumentType.word())
                         .executes(tpHereNoCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpRandom = Commands.literal(config.commandConfig.commandTpRandom)
+        LiteralArgumentBuilder<CommandSourceStack> tphCancel = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpHereCancel)
+                .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HERE_CANCEL))
+                .executes(tpHereCancelCommand)
+                .then(Commands.argument("requestIndex", IntegerArgumentType.integer(1))
+                        .suggests(buildReqIndexSuggestions(ETeleportType.TP_HERE, false))
+                        .executes(tpHereCancelCommand)
+                )
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(tpHereCancelCommand)
+                )
+                .then(Commands.argument("requestId", StringArgumentType.word())
+                        .executes(tpHereCancelCommand)
+                );
+        LiteralArgumentBuilder<CommandSourceStack> tpRandom = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpRandom)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_RANDOM))
                 .executes(tpRandomCommand)
                 .then(Commands.argument("range", IntegerArgumentType.integer(1))
@@ -1335,7 +1656,7 @@ public class FarewellCommand {
                                 )
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpSpawn = Commands.literal(config.commandConfig.commandTpSpawn)
+        LiteralArgumentBuilder<CommandSourceStack> tpSpawn = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpSpawn)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_SPAWN))
                 .executes(tpSpawnCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
@@ -1346,42 +1667,42 @@ public class FarewellCommand {
                                 .executes(tpSpawnCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpWorldSpawn = Commands.literal(config.commandConfig.commandTpWorldSpawn)
+        LiteralArgumentBuilder<CommandSourceStack> tpWorldSpawn = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpWorldSpawn)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_WORLD_SPAWN))
                 .executes(tpWorldSpawnCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
                         .suggests(safeSuggestions)
                         .executes(tpWorldSpawnCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpTop = Commands.literal(config.commandConfig.commandTpTop)
+        LiteralArgumentBuilder<CommandSourceStack> tpTop = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpTop)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_TOP))
                 .executes(tpTopCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
                         .suggests(safeSuggestions)
                         .executes(tpTopCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpBottom = Commands.literal(config.commandConfig.commandTpBottom)
+        LiteralArgumentBuilder<CommandSourceStack> tpBottom = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpBottom)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_BOTTOM))
                 .executes(tpBottomCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
                         .suggests(safeSuggestions)
                         .executes(tpBottomCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpUp = Commands.literal(config.commandConfig.commandTpUp)
+        LiteralArgumentBuilder<CommandSourceStack> tpUp = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpUp)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_UP))
                 .executes(tpUpCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
                         .suggests(safeSuggestions)
                         .executes(tpUpCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpDown = Commands.literal(config.commandConfig.commandTpDown)
+        LiteralArgumentBuilder<CommandSourceStack> tpDown = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpDown)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_DOWN))
                 .executes(tpDownCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
                         .suggests(safeSuggestions)
                         .executes(tpDownCommand)
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpView = Commands.literal(config.commandConfig.commandTpView)
+        LiteralArgumentBuilder<CommandSourceStack> tpView = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpView)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_VIEW))
                 .executes(tpViewCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
@@ -1392,16 +1713,44 @@ public class FarewellCommand {
                                 .executes(tpViewCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> tpHome = Commands.literal(config.commandConfig.commandTpHome)
+        LiteralArgumentBuilder<CommandSourceStack> tpHome = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpHome)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HOME))
                 .executes(tpHomeCommand)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests(homeSuggestions)
                         .executes(tpHomeCommand)
                         .then(Commands.argument("safe", BoolArgumentType.bool())
+                                .suggests((context, builder) -> {
+                                    String name = getStringDefault(context, "name", null);
+                                    if ("true".equals(name) || "false".equals(name)) {
+                                        ServerPlayer player = context.getSource().getPlayerOrException();
+                                        IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                                        for (KeyValue<String, String> keyValue : data.getHomeCoordinate().keySet()) {
+                                            builder.suggest(keyValue.getKey());
+                                        }
+                                        if (data.getHomeCoordinate().keySet().stream()
+                                                .anyMatch(kv -> kv.getValue().equals("true") || kv.getValue().equals("false"))) {
+                                            builder.suggest("true");
+                                            builder.suggest("false");
+                                        }
+                                    } else {
+                                        builder.suggest("true");
+                                        builder.suggest("false");
+                                    }
+                                    return builder.buildFuture();
+                                })
                                 .executes(tpHomeCommand)
                                 .then(Commands.argument("dimension", StringArgumentType.greedyString())
-                                        .suggests(dimensionSuggestions)
+                                        .suggests((context, builder) -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                                            String name = StringArgumentType.getString(context, "name");
+                                            for (KeyValue<String, String> keyValue : data.getHomeCoordinate().keySet()) {
+                                                if (keyValue.getValue().equals(name))
+                                                    builder.suggest(keyValue.getKey());
+                                            }
+                                            return builder.buildFuture();
+                                        })
                                         .executes(tpHomeCommand)
                                 )
                         )
@@ -1409,14 +1758,14 @@ public class FarewellCommand {
                 .then(Commands.argument("safe", BoolArgumentType.bool())
                         .executes(tpHomeCommand)
                         .then(Commands.argument("dimension", StringArgumentType.greedyString())
-                                .suggests(dimensionSuggestions)
+//                                .suggests(dimensionSuggestions)
                                 .executes(tpHomeCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> setHome = Commands.literal(config.commandConfig.commandSetHome)
+        LiteralArgumentBuilder<CommandSourceStack> setHome = Commands.literal(ConfigManager.getConfig().commandConfig.commandSetHome)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HOME))
                 .executes(setHomeCommand)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests((context, builder) -> {
                             builder.suggest("home");
                             builder.suggest("name");
@@ -1427,57 +1776,87 @@ public class FarewellCommand {
                                 .executes(setHomeCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> delHome = Commands.literal(config.commandConfig.commandDelHome)
+        LiteralArgumentBuilder<CommandSourceStack> delHome = Commands.literal(ConfigManager.getConfig().commandConfig.commandDelHome)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_HOME))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests(homeSuggestions)
-                        .then(Commands.argument("dimension", DimensionArgument.dimension())
+                        .executes(delHomeCommand)
+                        .then(Commands.argument("dimension", StringArgumentType.greedyString())
+                                .suggests((context, builder) -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                                    String name = StringArgumentType.getString(context, "name");
+                                    for (KeyValue<String, String> keyValue : data.getHomeCoordinate().keySet()) {
+                                        if (keyValue.getValue().equals(name))
+                                            builder.suggest(keyValue.getKey());
+                                    }
+                                    return builder.buildFuture();
+                                })
                                 .executes(delHomeCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> getHome = Commands.literal(config.commandConfig.commandGetHome)
+        LiteralArgumentBuilder<CommandSourceStack> getHome = Commands.literal(ConfigManager.getConfig().commandConfig.commandGetHome)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.GET_HOME))
                 .executes(getHomeCommand);
-        LiteralArgumentBuilder<CommandSourceStack> tpStage = Commands.literal(config.commandConfig.commandTpStage)
+        LiteralArgumentBuilder<CommandSourceStack> tpStage = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpStage)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_STAGE))
                 .executes(tpStageCommand)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests(stageSuggestions)
                         .executes(tpStageCommand)
                         .then(Commands.argument("safe", StringArgumentType.word())
                                 .suggests(safeSuggestions)
                                 .executes(tpStageCommand)
-                                .then(Commands.argument("dimension", DimensionArgument.dimension())
+                                .then(Commands.argument("dimension", StringArgumentType.greedyString())
+                                        .suggests((context, builder) -> {
+                                            WorldStageData data = WorldStageData.get();
+                                            String name = StringArgumentType.getString(context, "name");
+                                            for (KeyValue<String, String> keyValue : data.getStageCoordinate().keySet()) {
+                                                if (keyValue.getValue().equals(name))
+                                                    builder.suggest(keyValue.getKey());
+                                            }
+                                            return builder.buildFuture();
+                                        })
                                         .executes(tpStageCommand)
                                 )
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> setStage = Commands.literal(config.commandConfig.commandSetStage)
+        LiteralArgumentBuilder<CommandSourceStack> setStage = Commands.literal(ConfigManager.getConfig().commandConfig.commandSetStage)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.SET_STAGE))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests((context, builder) -> {
                             builder.suggest("stage");
                             return builder.buildFuture();
                         })
                         .executes(setStageCommand)
                         .then(Commands.argument("coordinate", Vec3Argument.vec3())
-                                .then(Commands.argument("dimension", DimensionArgument.dimension())
+                                .then(Commands.argument("dimension", StringArgumentType.greedyString())
                                         .executes(setStageCommand)
                                 )
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> delStage = Commands.literal(config.commandConfig.commandDelStage)
+        LiteralArgumentBuilder<CommandSourceStack> delStage = Commands.literal(ConfigManager.getConfig().commandConfig.commandDelStage)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.DEL_STAGE))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .suggests(stageSuggestions)
-                        .then(Commands.argument("dimension", DimensionArgument.dimension())
+                        .executes(delStageCommand)
+                        .then(Commands.argument("dimension", StringArgumentType.greedyString())
+                                .suggests((context, builder) -> {
+                                    WorldStageData data = WorldStageData.get();
+                                    String name = StringArgumentType.getString(context, "name");
+                                    for (KeyValue<String, String> keyValue : data.getStageCoordinate().keySet()) {
+                                        if (keyValue.getValue().equals(name))
+                                            builder.suggest(keyValue.getKey());
+                                    }
+                                    return builder.buildFuture();
+                                })
                                 .executes(delStageCommand)
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> getstage = Commands.literal(config.commandConfig.commandGetStage)
+        LiteralArgumentBuilder<CommandSourceStack> getStage = Commands.literal(ConfigManager.getConfig().commandConfig.commandGetStage)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.GET_STAGE))
                 .executes(getStageCommand);
-        LiteralArgumentBuilder<CommandSourceStack> tpBack = Commands.literal(config.commandConfig.commandTpBack)
+        LiteralArgumentBuilder<CommandSourceStack> tpBack = Commands.literal(ConfigManager.getConfig().commandConfig.commandTpBack)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.TP_BACK))
                 .executes(tpBackCommand)
                 .then(Commands.argument("safe", StringArgumentType.word())
@@ -1485,18 +1864,36 @@ public class FarewellCommand {
                         .executes(tpBackCommand)
                         .then(Commands.argument("type", StringArgumentType.word())
                                 .suggests((context, builder) -> {
+                                    String type = getStringEmpty(context, "type");
+                                    if (StringUtils.isNullOrEmptyEx(type)) {
+                                        builder.suggest("ALL");
+                                    }
                                     for (ETeleportType value : ETeleportType.values()) {
-                                        builder.suggest(value.name());
+                                        if (StringUtils.isNullOrEmptyEx(type) || value.name().toLowerCase().contains(type.toLowerCase())) {
+                                            builder.suggest(value.name());
+                                        }
                                     }
                                     return builder.buildFuture();
                                 })
                                 .executes(tpBackCommand)
-                                .then(Commands.argument("dimension", DimensionArgument.dimension())
+                                .then(Commands.argument("dimension", StringArgumentType.greedyString())
+                                        .suggests((context, builder) -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+                                            ETeleportType type = ETeleportType.nullableValueOf(getStringEmpty(context, "type"));
+                                            data.getTeleportRecords().stream()
+                                                    .filter(record -> type == null || record.getTeleportType().equals(type))
+                                                    .filter(Objects::nonNull)
+                                                    .map(record -> record.getBefore().getDimension().location().toString())
+                                                    .filter(StringUtils::isNotNullOrEmpty)
+                                                    .forEach(builder::suggest);
+                                            return builder.buildFuture();
+                                        })
                                         .executes(tpBackCommand)
                                 )
                         )
                 );
-        LiteralArgumentBuilder<CommandSourceStack> virtualOp = Commands.literal(config.commandConfig.commandVirtualOp)
+        LiteralArgumentBuilder<CommandSourceStack> virtualOp = Commands.literal(ConfigManager.getConfig().commandConfig.commandVirtualOp)
                 .requires(source -> NarcissusUtils.hasCommandPermission(source, ECommandType.VIRTUAL_OP))
                 .then(Commands.argument("operation", StringArgumentType.word())
                         .suggests((context, builder) -> {
@@ -1517,24 +1914,19 @@ public class FarewellCommand {
                                                     || operation.equalsIgnoreCase(EOperationType.LIST.name().toLowerCase())) {
                                                 return builder.buildFuture();
                                             }
-                                            StringRange stringRange = context.getNodes().stream()
-                                                    .filter(o -> o.getNode().getName().equalsIgnoreCase("rules"))
-                                                    .map(ParsedCommandNode::getRange)
-                                                    .findFirst().orElse(new StringRange(0, 0));
-                                            String input = context.getInput().substring(stringRange.getStart(), stringRange.getEnd());
+                                            String input = getStringEmpty(context, "rules").replace(" ", ",");
                                             String[] split = input.split(",");
-                                            String current = split[split.length - 1];
+                                            String current = input.endsWith(",") ? "" : split[split.length - 1];
                                             for (ECommandType value : Arrays.stream(ECommandType.values())
                                                     .filter(ECommandType::isOp)
                                                     .filter(type -> Arrays.stream(split).noneMatch(in -> in.equalsIgnoreCase(type.name())))
-                                                    .filter(type -> StringUtils.isNullOrEmptyEx(current) || type.name().startsWith(current))
+                                                    .filter(type -> StringUtils.isNullOrEmptyEx(current) || type.name().toLowerCase().contains(current.toLowerCase()))
                                                     .sorted(Comparator.comparing(ECommandType::getSort))
                                                     .toList()) {
                                                 String suggest = value.name();
-                                                if (split.length > 1) {
-                                                    suggest = input.substring(0, input.lastIndexOf(",")) + "," + suggest;
+                                                if (input.endsWith(",")) {
+                                                    suggest = input + suggest;
                                                 }
-                                                suggest += ",";
                                                 builder.suggest(suggest);
                                             }
                                             return builder.buildFuture();
@@ -1546,148 +1938,172 @@ public class FarewellCommand {
 
         // 注册简短的指令
         {
-            // 获取当前世界的维度ID /dim
-            if (config.conciseConfig.conciseDimension) {
-                dispatcher.register(dim);
+            // 设置语言 /language
+            if (ConfigManager.getConfig().conciseConfig.conciseLanguage) {
+                dispatcher.register(language);
             }
 
             // 获取玩家UUID /uuid
-            if (config.conciseConfig.conciseUuid) {
+            if (ConfigManager.getConfig().conciseConfig.conciseUuid) {
                 dispatcher.register(uuid);
             }
 
+            // 获取当前世界的维度ID /dim
+            if (ConfigManager.getConfig().conciseConfig.conciseDimension) {
+                dispatcher.register(dim);
+            }
+
+            // 获取玩家传送卡数量 /card
+            if (ConfigManager.getConfig().conciseConfig.conciseCard && ConfigManager.getConfig().teleportCard) {
+                dispatcher.register(card);
+            }
+
+            // 分享坐标 /share
+            if (ConfigManager.getConfig().conciseConfig.conciseShare && ConfigManager.getConfig().switchConfig.switchShare) {
+                dispatcher.register(share);
+            }
+
             // 自杀或毒杀 /feed
-            if (config.conciseConfig.conciseFeed) {
+            if (ConfigManager.getConfig().conciseConfig.conciseFeed && ConfigManager.getConfig().switchConfig.switchFeed) {
                 dispatcher.register(feed);
             }
 
             // 传送至指定位置 /tpx
-            if (config.conciseConfig.conciseTpCoordinate) {
+            if (ConfigManager.getConfig().conciseConfig.conciseTpCoordinate && ConfigManager.getConfig().switchConfig.switchTpCoordinate) {
                 dispatcher.register(tpx);
             }
 
             // 传送至指定结构或生物群系 /tpst
-            if (config.conciseConfig.conciseTpStructure) {
+            if (ConfigManager.getConfig().conciseConfig.conciseTpStructure && ConfigManager.getConfig().switchConfig.switchTpStructure) {
                 dispatcher.register(tpst);
             }
 
-            // 传送请求 /tpa
-            if (config.conciseConfig.conciseTpAsk) {
+            //传送请求 /tpa
+            if (ConfigManager.getConfig().conciseConfig.conciseTpAsk && ConfigManager.getConfig().switchConfig.switchTpAsk) {
                 dispatcher.register(tpa);
             }
 
-            // 传送请求同意 /tpay
-            if (config.conciseConfig.conciseTpAskYes) {
+            //传送请求同意 /tpay
+            if (ConfigManager.getConfig().conciseConfig.conciseTpAskYes && ConfigManager.getConfig().switchConfig.switchTpAsk) {
                 dispatcher.register(tpaYes);
             }
 
-            // 传送请求拒绝 /tpan
-            if (config.conciseConfig.conciseTpAskNo) {
+            //传送请求拒绝 /tpan
+            if (ConfigManager.getConfig().conciseConfig.conciseTpAskNo && ConfigManager.getConfig().switchConfig.switchTpAsk) {
                 dispatcher.register(tpaNo);
             }
 
-            // 被传送请求 /tph
-            if (config.conciseConfig.conciseTpHere) {
+            // 传送请求取消 /tpac
+            if (ConfigManager.getConfig().conciseConfig.conciseTpAskCancel && ConfigManager.getConfig().switchConfig.switchTpAsk) {
+                dispatcher.register(tpaCancel);
+            }
+
+            //被传送请求 /tph
+            if (ConfigManager.getConfig().conciseConfig.conciseTpHere && ConfigManager.getConfig().switchConfig.switchTpHere) {
                 dispatcher.register(tph);
             }
 
-            // 被传送请求同意 /tphy
-            if (config.conciseConfig.conciseTpHereYes) {
+            //被传送请求同意 /tphy
+            if (ConfigManager.getConfig().conciseConfig.conciseTpHereYes && ConfigManager.getConfig().switchConfig.switchTpHere) {
                 dispatcher.register(tphYes);
             }
 
-            // 被传送请求拒绝 /tphn
-            if (config.conciseConfig.conciseTpHereNo) {
+            //被传送请求拒绝 /tphn
+            if (ConfigManager.getConfig().conciseConfig.conciseTpHereNo && ConfigManager.getConfig().switchConfig.switchTpHere) {
                 dispatcher.register(tphNo);
             }
 
-            // 随机传送，允许指定范围 /tpr
-            if (config.conciseConfig.conciseTpRandom) {
+            // 被传送请求取消 /tphc
+            if (ConfigManager.getConfig().conciseConfig.conciseTpHereCancel && ConfigManager.getConfig().switchConfig.switchTpHere) {
+                dispatcher.register(tphCancel);
+            }
+
+            //随机传送，允许指定范围 /tpr
+            if (ConfigManager.getConfig().conciseConfig.conciseTpRandom && ConfigManager.getConfig().switchConfig.switchTpRandom) {
                 dispatcher.register(tpRandom);
             }
 
-            // 传送至出生点 /tps
-            if (config.conciseConfig.conciseTpSpawn) {
+            //传送至出生点 /tps
+            if (ConfigManager.getConfig().conciseConfig.conciseTpSpawn && ConfigManager.getConfig().switchConfig.switchTpSpawn) {
                 dispatcher.register(tpSpawn);
             }
 
-            // 传送至世界出生点 /tpws
-            if (config.conciseConfig.conciseTpWorldSpawn) {
+            //传送至世界出生点 /tpws
+            if (ConfigManager.getConfig().conciseConfig.conciseTpWorldSpawn && ConfigManager.getConfig().switchConfig.switchTpWorldSpawn) {
                 dispatcher.register(tpWorldSpawn);
             }
 
-            // 传送至头顶最上方方块 /tpt
-            if (config.conciseConfig.conciseTpTop) {
+            //传送至头顶最上方方块 /tpt
+            if (ConfigManager.getConfig().conciseConfig.conciseTpTop && ConfigManager.getConfig().switchConfig.switchTpTop) {
                 dispatcher.register(tpTop);
             }
 
-            // 传送至脚下最下方方块 /tpb
-            if (config.conciseConfig.conciseTpBottom) {
+            //传送至脚下最下方方块 /tpb
+            if (ConfigManager.getConfig().conciseConfig.conciseTpBottom && ConfigManager.getConfig().switchConfig.switchTpBottom) {
                 dispatcher.register(tpBottom);
             }
 
-            // 传送至头顶最近方块 /tpu
-            if (config.conciseConfig.conciseTpUp) {
+            //传送至头顶最近方块 /tpu
+            if (ConfigManager.getConfig().conciseConfig.conciseTpUp && ConfigManager.getConfig().switchConfig.switchTpUp) {
                 dispatcher.register(tpUp);
             }
 
-            // 传送至脚下最近方块 /tpd
-            if (config.conciseConfig.conciseTpDown) {
+            //传送至脚下最近方块 /tpd
+            if (ConfigManager.getConfig().conciseConfig.conciseTpDown && ConfigManager.getConfig().switchConfig.switchTpDown) {
                 dispatcher.register(tpDown);
             }
 
-            // 传送至视线尽头 /tpv
-            if (config.conciseConfig.conciseTpView) {
+            //传送至视线尽头 /tpv
+            if (ConfigManager.getConfig().conciseConfig.conciseTpView && ConfigManager.getConfig().switchConfig.switchTpView) {
                 dispatcher.register(tpView);
             }
 
-            // 传送至传送点 /home
-            if (config.conciseConfig.conciseTpHome) {
+            //传送至传送点 /home
+            if (ConfigManager.getConfig().conciseConfig.conciseTpHome && ConfigManager.getConfig().switchConfig.switchTpHome) {
                 dispatcher.register(tpHome);
             }
 
-            // 添加传送点 /sethome
-            if (config.conciseConfig.conciseSetHome) {
+            //添加传送点 /sethome
+            if (ConfigManager.getConfig().conciseConfig.conciseSetHome && ConfigManager.getConfig().switchConfig.switchTpHome) {
                 dispatcher.register(setHome);
             }
 
-            // 删除传送点 /delhome
-            if (config.conciseConfig.conciseDelHome) {
+            //删除传送点 /delhome
+            if (ConfigManager.getConfig().conciseConfig.conciseDelHome && ConfigManager.getConfig().switchConfig.switchTpHome) {
                 dispatcher.register(delHome);
             }
 
-            // 获取传送点 /gethome
-            if (config.conciseConfig.conciseGetHome) {
+            //获取传送点 /gethome
+            if (ConfigManager.getConfig().conciseConfig.conciseGetHome && ConfigManager.getConfig().switchConfig.switchTpHome) {
                 dispatcher.register(getHome);
             }
 
-            // 传送至驿站 /stage
-            if (config.conciseConfig.conciseTpStage) {
+            //传送至驿站 /stage
+            if (ConfigManager.getConfig().conciseConfig.conciseTpStage && ConfigManager.getConfig().switchConfig.switchTpStage) {
                 dispatcher.register(tpStage);
             }
 
-            // 添加驿站 /setstage
-            if (config.conciseConfig.conciseSetStage) {
+            //添加驿站 /setstage
+            if (ConfigManager.getConfig().conciseConfig.conciseSetStage && ConfigManager.getConfig().switchConfig.switchTpStage) {
                 dispatcher.register(setStage);
             }
 
-            // 删除驿站 /delstage
-            if (config.conciseConfig.conciseDelStage) {
+            //删除驿站 /delstage
+            if (ConfigManager.getConfig().conciseConfig.conciseDelStage && ConfigManager.getConfig().switchConfig.switchTpStage) {
                 dispatcher.register(delStage);
             }
 
-            // 获取驿站 /getstage
-            if (config.conciseConfig.conciseGetStage) {
-                dispatcher.register(getstage);
+            //获取驿站 /getStage
+            if (ConfigManager.getConfig().conciseConfig.conciseGetStage && ConfigManager.getConfig().switchConfig.switchTpStage) {
+                dispatcher.register(getStage);
             }
 
-            // 返回上次离开地方 /back
-            if (config.conciseConfig.conciseTpBack) {
+            //返回上次离开地方 /back
+            if (ConfigManager.getConfig().conciseConfig.conciseTpBack && ConfigManager.getConfig().switchConfig.switchTpBack) {
                 dispatcher.register(tpBack);
             }
-
             // 设置虚拟权限
-            if (config.conciseConfig.conciseVirtualOp) {
+            if (ConfigManager.getConfig().conciseConfig.conciseVirtualOp) {
                 dispatcher.register(virtualOp);
             }
 
@@ -1704,10 +2120,16 @@ public class FarewellCommand {
                                     .executes(helpCommand)
                             )
                     )
+                    // 设置语言 /narcissus language
+                    .then(language)
                     // 获取当前世界的维度ID /narcissus dim
                     .then(dim)
-                    // 获取玩家UUID /uuid
+                    // 获取玩家UUID /narcissus uuid
                     .then(uuid)
+                    // 获取玩家传送卡数量 /narcissus card
+                    .then(card)
+                    // 分享坐标 /narcissus share
+                    .then(share)
                     // 自杀或毒杀 /narcissus feed
                     .then(feed)
                     // 传送至指定位置 /narcissus tpx
@@ -1720,12 +2142,16 @@ public class FarewellCommand {
                     .then(tpaYes)
                     // 传送请求拒绝 /narcissus tpan
                     .then(tpaNo)
+                    // 传送请求取消 /narcissus tpac
+                    .then(tpaCancel)
                     // 被传送请求 /narcissus tph
                     .then(tph)
                     // 被传送请求同意 /narcissus tphy
                     .then(tphYes)
                     // 被传送请求拒绝 /narcissus tphn
                     .then(tphNo)
+                    // 被传送请求取消 /narcissus tphc
+                    .then(tphCancel)
                     // 随机传送，允许指定范围 /narcissus tpr
                     .then(tpRandom)
                     // 传送至出生点 /narcissus tps
@@ -1756,8 +2182,8 @@ public class FarewellCommand {
                     .then(setStage)
                     // 删除驿站 /narcissus delstage
                     .then(delStage)
-                    // 获取驿站 /narcissus getstage
-                    .then(getstage)
+                    // 获取驿站 /narcissus getStage
+                    .then(getStage)
                     // 返回上次离开地方 /narcissus back
                     .then(tpBack)
                     // 设置虚拟权限 /narcissus opv
@@ -1768,9 +2194,9 @@ public class FarewellCommand {
                                     .then(Commands.literal("teleportCard")
                                             .executes(context -> {
                                                 ServerPlayer player = context.getSource().getPlayerOrException();
-                                                Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(player)
+                                                Component msg = Component.translatable(I18nUtils.getKey(EI18nType.MESSAGE, "server_config_status")
                                                         , I18nUtils.getKey(EI18nType.MESSAGE, "server_config_status")
-                                                        , I18nUtils.enabled(NarcissusUtils.getPlayerLanguage(player), config.teleportCard)
+                                                        , I18nUtils.enabled(NarcissusUtils.getPlayerLanguage(player), ConfigManager.getConfig().teleportCard)
                                                         , Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.WORD, "teleport_card"));
                                                 NarcissusUtils.sendMessage(player, msg);
                                                 return 1;
@@ -1783,33 +2209,105 @@ public class FarewellCommand {
                                     .then(Commands.literal("teleportCard")
                                             .then(Commands.argument("bool", BoolArgumentType.bool())
                                                     .executes(context -> {
-                                                        config.teleportCard = BoolArgumentType.getBool(context, "bool");
+                                                        ConfigManager.getConfig().teleportCard = BoolArgumentType.getBool(context, "bool");
                                                         AutoConfig.getConfigHolder(ServerConfig.class).save();
 
                                                         ServerPlayer player = context.getSource().getPlayerOrException();
-                                                        Component msg = Component.translatable(NarcissusUtils.getPlayerLanguage(player)
+                                                        Component msg = Component.translatable(I18nUtils.getKey(EI18nType.MESSAGE, "server_config_status")
                                                                 , I18nUtils.getKey(EI18nType.MESSAGE, "server_config_status")
-                                                                , I18nUtils.enabled(NarcissusUtils.getPlayerLanguage(player), config.teleportCard)
+                                                                , I18nUtils.enabled(NarcissusUtils.getPlayerLanguage(player), ConfigManager.getConfig().teleportCard)
                                                                 , Component.translatable(NarcissusUtils.getPlayerLanguage(player), EI18nType.WORD, "teleport_card"));
                                                         NarcissusUtils.broadcastMessage(player, msg);
                                                         return 1;
                                                     })
                                             )
                                     )
+                                    .then(Commands.literal("mode")
+                                            .then(Commands.argument("mode", IntegerArgumentType.integer(0))
+                                                    .suggests((context, builder) -> {
+                                                        builder.suggest(0);
+                                                        builder.suggest(1);
+                                                        builder.suggest(2);
+                                                        builder.suggest(3);
+                                                        return builder.buildFuture();
+                                                    })
+                                                    .executes(context -> {
+                                                        int mode = IntegerArgumentType.getInteger(context, "mode");
+                                                        CommandSourceStack source = context.getSource();
+                                                        String lang;
+                                                        if (source.getEntity() != null && source.getEntity() instanceof ServerPlayer) {
+                                                            lang = NarcissusUtils.getPlayerLanguage(source.getPlayerOrException());
+                                                        } else {
+                                                            lang = ConfigManager.getConfig().defaultLanguage;
+                                                        }
+                                                        switch (mode) {
+                                                            case 0:
+                                                                ServerConfig.resetConfig();
+                                                                break;
+                                                            case 1:
+                                                                ServerConfig.resetConfigWithMode1();
+                                                                break;
+                                                            case 2:
+                                                                ServerConfig.resetConfigWithMode2();
+                                                                break;
+                                                            case 3:
+                                                                ServerConfig.resetConfigWithMode3();
+                                                                break;
+                                                            default: {
+                                                                throw new IllegalArgumentException("Mode " + mode + " does not exist");
+                                                            }
+                                                        }
+                                                        Component component = Component.translatable(lang, EI18nType.MESSAGE, "server_config_mode", mode);
+                                                        source.sendSuccess(() -> component.toChatComponent(lang), false);
+
+                                                        // 更新权限信息
+                                                        source.getServer().getPlayerList().getPlayers()
+                                                                .forEach(player -> source.getServer()
+                                                                        .getPlayerList()
+                                                                        .sendPlayerPermissionLevel(player)
+                                                                );
+                                                        return 1;
+                                                    })
+                                            )
+                                    )
+                                    .then(Commands.literal("language")
+                                            .then(Commands.argument("language", StringArgumentType.word())
+                                                    .suggests((context, builder) -> {
+                                                        I18nUtils.getI18nFiles().forEach(builder::suggest);
+                                                        return builder.buildFuture();
+                                                    })
+                                                    .executes(context -> {
+                                                        String code = StringArgumentType.getString(context, "language");
+                                                        ConfigManager.getConfig().defaultLanguage = code;
+                                                        ConfigManager.save();
+                                                        ServerPlayer player = context.getSource().getPlayerOrException();
+                                                        NarcissusUtils.broadcastMessage(player, Component.translatable(player, EI18nType.MESSAGE, "server_default_language", ConfigManager.getConfig().defaultLanguage));
+                                                        return 1;
+                                                    })
+                                            )
+                                    )
                             )
-                    ));
+                            )
+                    );
         }
     }
 
-    private static String getRequestId(CommandContext<CommandSourceStack> context, ETeleportType teleportType) {
+    /**
+     * 获取传送请求ID
+     *
+     * @param context      指令上下文
+     * @param teleportType 传送类型
+     * @param isTarget     是否根据接收方查找
+     */
+    private static String getRequestId(CommandContext<CommandSourceStack> context, ETeleportType teleportType, final boolean isTarget) {
         String result = null;
         try {
             ServerPlayer player = context.getSource().getPlayerOrException();
             try {
                 ServerPlayer requester = EntityArgument.getPlayer(context, "player");
                 Map.Entry<String, TeleportRequest> entry1 = NarcissusFarewell.getTeleportRequest().entrySet().stream()
-                        .filter(entry -> entry.getValue().getTarget().getUUID().equals(player.getUUID()))
-                        .filter(entry -> entry.getValue().getRequester().getUUID().equals(requester.getUUID()))
+                        .filter(entry -> isTarget ? entry.getValue().getTarget().getUUID().equals(player.getUUID()) : entry.getValue().getRequester().getUUID().equals(player.getUUID()))
+                        .filter(entry -> isTarget ? entry.getValue().getRequester().getUUID().equals(requester.getUUID()) : entry.getValue().getTarget().getUUID().equals(requester.getUUID()))
                         .filter(entry -> entry.getValue().getTeleportType() == teleportType)
                         .max(Comparator.comparing(entry -> entry.getValue().getRequestTime()))
                         .orElse(null);
@@ -1826,7 +2324,7 @@ public class FarewellCommand {
                     try {
                         int askIndex = IntegerArgumentType.getInteger(context, "requestIndex");
                         List<Map.Entry<String, TeleportRequest>> entryList = NarcissusFarewell.getTeleportRequest().entrySet().stream()
-                                .filter(entry -> entry.getValue().getTarget().getUUID().equals(player.getUUID()))
+                                .filter(entry -> isTarget ? entry.getValue().getTarget().getUUID().equals(player.getUUID()) : entry.getValue().getRequester().getUUID().equals(player.getUUID()))
                                 .filter(entry -> entry.getValue().getTeleportType() == teleportType)
                                 // 使用负数实现倒序排列
                                 .sorted(Comparator.comparing(entry -> -entry.getValue().getRequestTime().getTime()))
@@ -1852,15 +2350,21 @@ public class FarewellCommand {
         return result;
     }
 
-    public static SuggestionProvider<CommandSourceStack> buildReqIndexSuggestions(ETeleportType teleportType) {
+    /**
+     * 构建传送请求ID补全
+     *
+     * @param teleportType 传送类型
+     * @param isTarget     是否根据接收方查找
+     */
+    public static SuggestionProvider<CommandSourceStack> buildReqIndexSuggestions(ETeleportType teleportType, final boolean isTarget) {
         return (context, builder) -> {
             ServerPlayer player = context.getSource().getPlayerOrException();
             NarcissusFarewell.getTeleportRequest().entrySet().stream()
-                    .filter(entry -> entry.getValue().getRequester().getUUID().equals(player.getUUID()))
+                    .filter(entry -> isTarget ? entry.getValue().getRequester().getUUID().equals(player.getUUID()) : entry.getValue().getTarget().getUUID().equals(player.getUUID()))
                     .filter(entry -> entry.getValue().getTeleportType() == teleportType)
                     .forEach(entry -> builder.suggest(entry.getKey()));
             for (int i = 0; i < NarcissusFarewell.getTeleportRequest().entrySet().stream()
-                    .filter(entry -> entry.getValue().getRequester().getUUID().equals(player.getUUID()))
+                    .filter(entry -> isTarget ? entry.getValue().getRequester().getUUID().equals(player.getUUID()) : entry.getValue().getTarget().getUUID().equals(player.getUUID()))
                     .filter(entry -> entry.getValue().getTeleportType() == teleportType)
                     .count(); i++) {
                 builder.suggest(i + 1);
@@ -1946,6 +2450,40 @@ public class FarewellCommand {
         // 判断是否有传送代价
         result = result && NarcissusUtils.validTeleportCost(player, target, type, submit);
         return !result;
+    }
+    public static String getStringEmpty(CommandContext<?> context, String name) {
+        return getStringDefault(context, name, "");
+    }
+
+    public static String getStringDefault(CommandContext<?> context, String name, String defaultValue) {
+        String result;
+        try {
+            result = StringArgumentType.getString(context, name);
+        } catch (IllegalArgumentException ignored) {
+            result = defaultValue;
+        }
+        return result;
+    }
+
+    /**
+     * 若为第一次使用指令则进行提示
+     */
+    public static void notifyHelp(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        Entity entity = source.getEntity();
+        if (entity instanceof ServerPlayer player) {
+            IPlayerTeleportData data = PlayerTeleportDataProvider.getData(player);
+            if (!data.isNotified()) {
+                Component button = Component.literal("/" + NarcissusUtils.getCommandPrefix())
+                        .setColor(EMCColor.AQUA.getColor())
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/" + NarcissusUtils.getCommandPrefix()))
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("/" + NarcissusUtils.getCommandPrefix())
+                                .toTextComponent())
+                        );
+                NarcissusUtils.sendMessage(player, Component.translatable(EI18nType.MESSAGE, "notify_help", button));
+                data.setNotified(true);
+            }
+        }
     }
 
 }

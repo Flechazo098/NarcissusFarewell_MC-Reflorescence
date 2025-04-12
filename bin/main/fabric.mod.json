@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "narcissus_farewell",
-  "version": "1.1.0",
+  "version": "1.0.9",
   "name": "NarcissusFarewell Reflorescence",
   "description": "这是一个传送 Mod，拥有各种常见的传送指令，并且支持自定义传送指令。",
   "authors": [],
