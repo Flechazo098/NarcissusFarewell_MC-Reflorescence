@@ -4,11 +4,13 @@ import lombok.NonNull;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import xin.vanilla.narcissus.data.TeleportRecord;
 import xin.vanilla.narcissus.config.Coordinate;
 import xin.vanilla.narcissus.config.KeyValue;
 import xin.vanilla.narcissus.enums.ETeleportType;
 
+import javax.annotation.Nullable;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -123,4 +125,23 @@ public interface IPlayerTeleportData {
 
     void deserializeNBT(CompoundTag nbt);
 
+    /**
+     * 获取语言
+     */
+    String getLanguage();
+
+    /**
+     * 设置语言
+     */
+    void setLanguage(String language);
+
+    /**
+     * 获取有效的语言
+     */
+    @NonNull
+    String getValidLanguage(@Nullable Player player);
+
+    boolean isNotified();
+
+    void setNotified(boolean notified);
 }

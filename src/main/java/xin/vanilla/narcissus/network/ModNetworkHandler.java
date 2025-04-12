@@ -3,6 +3,7 @@ package xin.vanilla.narcissus.network;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -176,5 +177,17 @@ public class ModNetworkHandler {
         FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeUtf(language);
         ClientPlayNetworking.send(CLIENT_LANGUAGE, buf);
+    }
+
+    /**
+     * 在资源重载时同步客户端语言到服务器
+     * 这个方法应该在客户端资源重载事件中调用
+     */
+    public static void syncClientLanguageOnResourceReload() {
+        if (Minecraft.getInstance().player != null) {
+            String currentLanguage = Minecraft.getInstance().getLanguageManager().getSelected();
+            sendClientLanguageToServer(currentLanguage);
+            LOGGER.info("Resource reload detected, syncing language: {}", currentLanguage);
+        }
     }
 }

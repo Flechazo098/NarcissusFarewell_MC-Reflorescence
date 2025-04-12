@@ -7,11 +7,17 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.GLFW;
+import xin.vanilla.narcissus.NarcissusFarewell;
 import xin.vanilla.narcissus.network.*;
 
 /**
@@ -36,6 +42,7 @@ public class ClientEventHandler implements ClientModInitializer {
         // 注册键绑定
         registerKeyBindings();
         ModNetworkHandler.registerClientReceivers();
+        registerSyncClientLanguage();
 
         // 注册客户端Tick事件
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -114,5 +121,38 @@ public class ClientEventHandler implements ClientModInitializer {
                 GLFW.GLFW_KEY_UNKNOWN,
                 CATEGORIES
         ));
+    }
+    /**
+     * 注册客户端事件
+     */
+    public static void registerSyncClientLanguage() {
+        // 注册资源重载监听器
+        registerResourceReloadListener();
+
+        // 注册客户端启动完成事件
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+            // 客户端启动完成后同步语言
+            ModNetworkHandler.syncClientLanguageOnResourceReload();
+        });
+    }
+    /**
+     * 注册资源重载监听器
+     */
+    private static void registerResourceReloadListener() {
+        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(
+                new SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public ResourceLocation getFabricId() {
+                        return new ResourceLocation(NarcissusFarewell.MOD_ID, "language_sync");
+                    }
+
+                    @Override
+                    public void onResourceManagerReload(ResourceManager resourceManager) {
+                        // 资源重载时同步语言
+                        LOGGER.info("Resource reload detected, syncing language...");
+                        ModNetworkHandler.syncClientLanguageOnResourceReload();
+                    }
+                }
+        );
     }
 }

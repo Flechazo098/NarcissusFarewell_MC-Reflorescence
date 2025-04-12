@@ -15,7 +15,7 @@ public class PlayerComponentInitializer implements EntityComponentInitializer {
         // 注册玩家传送数据组件
         registry.registerForPlayers(
                 PlayerTeleportDataComponent.KEY,
-                player -> new PlayerTeleportDataComponent(player), // 使用lambda表达式延迟创建组件实例
+                player -> new PlayerTeleportDataComponent(player),
                 RespawnCopyStrategy.ALWAYS_COPY
         );
     }

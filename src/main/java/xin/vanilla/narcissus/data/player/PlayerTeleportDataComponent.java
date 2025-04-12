@@ -3,12 +3,14 @@ package xin.vanilla.narcissus.data.player;
 import dev.onyxstudios.cca.api.v3.component.ComponentKey;
 import dev.onyxstudios.cca.api.v3.component.ComponentRegistry;
 import dev.onyxstudios.cca.api.v3.component.sync.AutoSyncedComponent;
+import lombok.NonNull;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import xin.vanilla.narcissus.NarcissusFarewell;
 import xin.vanilla.narcissus.network.ModNetworkHandler;
 import xin.vanilla.narcissus.network.PlayerDataSyncPacket;
@@ -213,4 +215,34 @@ public class PlayerTeleportDataComponent implements IPlayerTeleportData, AutoSyn
         data.deserializeNBT(nbt);
     }
 
+    @Override
+    public String getLanguage() {
+        return data.getLanguage();
+    }
+
+    @Override
+    public void setLanguage(String language) {
+        data.setLanguage(language);
+        // 立即同步到客户端
+        if (player instanceof ServerPlayer serverPlayer) {
+            KEY.sync(player);
+            syncPlayerData(serverPlayer);
+        }
+    }
+
+    @Override
+    public @NonNull String getValidLanguage(@Nullable Player player) {
+        return data.getValidLanguage(player);
+    }
+
+    @Override
+    public boolean isNotified() {
+        return data.isNotified();
+    }
+
+    @Override
+    public void setNotified(boolean notified) {
+        data.setNotified(notified);
+        KEY.sync(player);
+    }
 }
