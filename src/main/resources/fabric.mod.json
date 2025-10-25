@@ -4,7 +4,10 @@
   "version": "1.1.0",
   "name": "NarcissusFarewell Reflorescence",
   "description": "这是一个传送 Mod，拥有各种常见的传送指令，并且支持自定义传送指令。",
-  "authors": [],
+  "authors": [
+    "Tsuki Maaii",
+    "Flechazo"
+  ],
   "contact": {
     "sources": "https://github.com/Flechazo098/NarcissusFarewell_MC-Reflorescence",
     "issues": "https://github.com/Flechazo098/NarcissusFarewell_MC-Reflorescence/issues"
