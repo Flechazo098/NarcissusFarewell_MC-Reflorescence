@@ -6,7 +6,7 @@ import lombok.NonNull;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xin.vanilla.narcissus.NarcissusFarewell;
-import xin.vanilla.narcissus.enums.EI18nType;
+import xin.vanilla.narcissus.enums.EnumI18nType;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -18,7 +18,7 @@ public class I18nUtils {
     private static final String DEFAULT_LANGUAGE = "en_us";
     private static final Gson GSON = new Gson();
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final String LANG_PATH = String.format("/assets/%s/lang/", NarcissusFarewell.MOD_ID);
+    private static final String LANG_PATH = String.format("/assets/%s/lang/", NarcissusFarewell.MODID);
     private static final String LANG_FILE_PATH = String.format("%s%%s.json", LANG_PATH);
 
     static {
@@ -46,14 +46,14 @@ public class I18nUtils {
     /**
      * 获取翻译文本
      */
-    public static String getTranslationClient(@NonNull EI18nType type, @NonNull String key) {
+    public static String getTranslationClient(@NonNull EnumI18nType type, @NonNull String key) {
         return getTranslation(getKey(type, key), NarcissusUtils.getClientLanguage());
     }
 
     /**
      * 获取翻译文本
      */
-    public static String getTranslation(@NonNull EI18nType type, @NonNull String key, @NonNull String languageCode) {
+    public static String getTranslation(@NonNull EnumI18nType type, @NonNull String key, @NonNull String languageCode) {
         return getTranslation(getKey(type, key), languageCode);
     }
 
@@ -69,18 +69,22 @@ public class I18nUtils {
         return key;
     }
 
-    public static String getKey(@NonNull EI18nType type, @NonNull String key) {
+    public static String getKey(@NonNull EnumI18nType type, @NonNull String key) {
         String result;
-        if (type == EI18nType.PLAIN || type == EI18nType.NONE) {
+        if (type == EnumI18nType.PLAIN || type == EnumI18nType.NONE) {
             result = key;
         } else {
-            result = String.format("%s.%s.%s", type.name().toLowerCase(), NarcissusFarewell.MOD_ID, key);
+            result = String.format("%s.%s.%s", type.name().toLowerCase(), NarcissusFarewell.MODID, key);
         }
         return result;
     }
 
     public static Component enabled(@NonNull String languageCode, boolean enabled) {
-        return Component.translatable(languageCode, EI18nType.WORD, enabled ? "enabled" : "disabled");
+        return Component.translatable(languageCode, EnumI18nType.WORD, enabled ? "enabled" : "disabled");
+    }
+
+    public static Component enabled(boolean enabled) {
+        return Component.translatable(EnumI18nType.WORD, enabled ? "enabled" : "disabled");
     }
 
     /**

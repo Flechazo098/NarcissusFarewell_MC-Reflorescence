@@ -2,7 +2,7 @@ package xin.vanilla.narcissus.util;
 
 
 import lombok.NonNull;
-import xin.vanilla.narcissus.enums.EMCColor;
+import xin.vanilla.narcissus.enums.EnumMCColor;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,8 +19,6 @@ public class StringUtils {
      * 将字符串转为逻辑真假
      *
      * @param s 0|1|真|假|是|否|true|false|y|n|t|f
-     * <p>
-     * 真真假假假假真真
      */
     public static boolean stringToBoolean(String s) {
         if (null == s) return false;
@@ -403,7 +401,7 @@ public class StringUtils {
         return "§" + argbToMinecraftColor(color).getCode();
     }
 
-    public static EMCColor argbToMinecraftColor(int color) {
+    public static EnumMCColor argbToMinecraftColor(int color) {
         // 获取 RGB 分量
         int red = (color >> 16) & 0xFF;
         int green = (color >> 8) & 0xFF;
@@ -411,8 +409,8 @@ public class StringUtils {
         // 颜色匹配
         double closestDistance = Double.MAX_VALUE;
         // 默认为白色
-        EMCColor result = EMCColor.WHITE;
-        for (EMCColor mcColor : EMCColor.values()) {
+        EnumMCColor result = EnumMCColor.WHITE;
+        for (EnumMCColor mcColor : EnumMCColor.values()) {
             int colorRGB = mcColor.getColor();
             int r = (colorRGB >> 16) & 0xFF;
             int g = (colorRGB >> 8) & 0xFF;
@@ -491,7 +489,6 @@ public class StringUtils {
         if (isWordString(input)) return input;
         return "'" + input.replaceAll("'", "\\\\'") + "'";
     }
-
 
     public static void main(String[] args) {
         // 测试案例：不同类型的参数与格式字符串

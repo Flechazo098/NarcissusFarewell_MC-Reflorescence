@@ -6,26 +6,231 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.NotNull;
-import xin.vanilla.narcissus.config.ConfigManager;
+import xin.vanilla.narcissus.data.Coordinate;
+import xin.vanilla.narcissus.data.KeyValue;
+import xin.vanilla.narcissus.data.PlayerAccess;
 import xin.vanilla.narcissus.data.TeleportRecord;
-import xin.vanilla.narcissus.config.Coordinate;
-import xin.vanilla.narcissus.config.KeyValue;
-import xin.vanilla.narcissus.enums.ETeleportType;
+import xin.vanilla.narcissus.enums.EnumTeleportType;
+import xin.vanilla.narcissus.network.ModNetworkHandler;
+import xin.vanilla.narcissus.network.packet.PlayerDataSyncPacket;
 import xin.vanilla.narcissus.util.CollectionUtils;
 import xin.vanilla.narcissus.util.DateUtils;
 import xin.vanilla.narcissus.util.NarcissusUtils;
 
-import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-
 /**
  * 玩家传送数据
  */
-public class PlayerTeleportData implements IPlayerTeleportData {
+public final class PlayerTeleportData implements IPlayerData<PlayerTeleportData> {
+
+    // region override
+
+    private static final Map<UUID, PlayerTeleportData> CACHE = Collections.synchronizedMap(new WeakHashMap<>());
+    private final Player player;
+    private boolean dirty = false;
+
+    private PlayerTeleportData(Player player) {
+        this.player = player;
+        if (this.player instanceof ServerPlayer) {
+            this.deserializeNBT(PlayerDataManager.instance().getOrCreate(player), false);
+        }
+    }
+
+    /**
+     * 获取或创建 PlayerTeleportData
+     */
+    public static PlayerTeleportData getData(Player player) {
+        return CACHE.computeIfAbsent(player.getUUID(), k -> new PlayerTeleportData(player));
+    }
+
+    @Override
+    public boolean isDirty() {
+        return this.dirty;
+    }
+
+    @Override
+    public void setDirty() {
+        this.dirty = true;
+    }
+
+    @Override
+    public void setDirty(boolean dirty) {
+        this.dirty = dirty;
+    }
+
+    @Override
+    public void writeToBuffer(FriendlyByteBuf buffer) {
+        buffer.writeBoolean(this.notified);
+        buffer.writeUtf(DateUtils.toDateTimeString(this.getLastCardTime()));
+        buffer.writeUtf(DateUtils.toDateTimeString(this.getLastTpTime()));
+        buffer.writeInt(this.getTeleportCard());
+
+        buffer.writeInt(this.teleportRecords.size());
+        for (TeleportRecord teleportRecord : this.getTeleportRecords()) {
+            buffer.writeNbt(teleportRecord.writeToNBT());
+        }
+
+        buffer.writeInt(this.getHomeCoordinate().size());
+        for (Map.Entry<KeyValue<String, String>, Coordinate> entry : this.getHomeCoordinate().entrySet()) {
+            buffer.writeUtf(entry.getKey().getKey());
+            buffer.writeUtf(entry.getKey().getValue());
+            buffer.writeNbt(entry.getValue().writeToNBT());
+        }
+
+        buffer.writeInt(this.getDefaultHome().size());
+        for (Map.Entry<String, String> entry : this.getDefaultHome().entrySet()) {
+            buffer.writeUtf(entry.getKey());
+            buffer.writeUtf(entry.getValue());
+        }
+
+        buffer.writeNbt(this.getAccess().writeToNBT());
+    }
+
+    @Override
+    public void readFromBuffer(FriendlyByteBuf buffer) {
+        this.notified = buffer.readBoolean();
+        this.lastCardTime = DateUtils.format(buffer.readUtf());
+        this.lastTpTime = DateUtils.format(buffer.readUtf());
+        this.teleportCard.set(buffer.readInt());
+
+        this.teleportRecords = new ArrayList<>();
+        for (int i = 0; i < buffer.readInt(); i++) {
+            this.teleportRecords.add(TeleportRecord.readFromNBT(Objects.requireNonNull(buffer.readNbt())));
+        }
+
+        this.homeCoordinate = new HashMap<>();
+        for (int i = 0; i < buffer.readInt(); i++) {
+            this.homeCoordinate.put(new KeyValue<>(buffer.readUtf(), buffer.readUtf()), Coordinate.readFromNBT(Objects.requireNonNull(buffer.readNbt())));
+        }
+
+        this.defaultHome = new HashMap<>();
+        for (int i = 0; i < buffer.readInt(); i++) {
+            this.defaultHome.put(buffer.readUtf(), buffer.readUtf());
+        }
+
+        this.access = PlayerAccess.readFromNBT(Objects.requireNonNull(buffer.readNbt()));
+
+        this.save();
+    }
+
+    @Override
+    public CompoundTag serializeNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.putBoolean("notified", this.notified);
+        tag.putString("lastCardTime", DateUtils.toDateTimeString(this.getLastCardTime()));
+        tag.putString("lastTpTime", DateUtils.toDateTimeString(this.getLastTpTime()));
+        tag.putInt("teleportCard", this.getTeleportCard());
+
+        // 序列化传送记录
+        ListTag recordsNBT = new ListTag();
+        for (TeleportRecord record : this.getTeleportRecords()) {
+            recordsNBT.add(record.writeToNBT());
+        }
+        tag.put("teleportRecords", recordsNBT);
+
+        // 序列化家坐标
+        ListTag homeCoordinateNBT = new ListTag();
+        for (Map.Entry<KeyValue<String, String>, Coordinate> entry : this.getHomeCoordinate().entrySet()) {
+            CompoundTag homeCoordinateTag = new CompoundTag();
+            homeCoordinateTag.putString("key", entry.getKey().getKey());
+            homeCoordinateTag.putString("value", entry.getKey().getValue());
+            homeCoordinateTag.put("coordinate", entry.getValue().writeToNBT());
+            homeCoordinateNBT.add(homeCoordinateTag);
+        }
+        tag.put("homeCoordinate", homeCoordinateNBT);
+
+        // 序列化默认家
+        ListTag defaultHomeNBT = new ListTag();
+        for (Map.Entry<String, String> entry : this.getDefaultHome().entrySet()) {
+            CompoundTag defaultHomeTag = new CompoundTag();
+            defaultHomeTag.putString("key", entry.getKey());
+            defaultHomeTag.putString("value", entry.getValue());
+            defaultHomeNBT.add(defaultHomeTag);
+        }
+        tag.put("defaultHome", defaultHomeNBT);
+
+        // 序列化黑白名单
+        tag.put("access", this.getAccess().writeToNBT());
+
+        return tag;
+    }
+
+    @Override
+    public void deserializeNBT(CompoundTag nbt, boolean dirty) {
+        this.notified = nbt.getBoolean("notified");
+        this.lastCardTime = DateUtils.format(nbt.getString("lastCardTime"));
+        this.lastTpTime = DateUtils.format(nbt.getString("lastTpTime"));
+        this.teleportCard.set(nbt.getInt("teleportCard"));
+
+        // 反序列化传送记录
+        ListTag recordsNBT = nbt.getList("teleportRecords", 10);
+        List<TeleportRecord> records = new ArrayList<>();
+        for (int i = 0; i < recordsNBT.size(); i++) {
+            records.add(TeleportRecord.readFromNBT(recordsNBT.getCompound(i)));
+        }
+        this.teleportRecords = records;
+
+        // 反序列化家坐标
+        ListTag homeCoordinateNBT = nbt.getList("homeCoordinate", 10);
+        Map<KeyValue<String, String>, Coordinate> homeCoordinateMap = new HashMap<>();
+        for (int i = 0; i < homeCoordinateNBT.size(); i++) {
+            CompoundTag homeCoordinateTag = homeCoordinateNBT.getCompound(i);
+            homeCoordinateMap.put(new KeyValue<>(homeCoordinateTag.getString("key"), homeCoordinateTag.getString("value")),
+                    Coordinate.readFromNBT(homeCoordinateTag.getCompound("coordinate")));
+        }
+        this.homeCoordinate = homeCoordinateMap;
+
+        // 反序列化默认家
+        ListTag defaultHomeNBT = nbt.getList("defaultHome", 10);
+        Map<String, String> defaultHomeMap = new HashMap<>();
+        for (int i = 0; i < defaultHomeNBT.size(); i++) {
+            CompoundTag defaultHomeTag = defaultHomeNBT.getCompound(i);
+            defaultHomeMap.put(defaultHomeTag.getString("key"), defaultHomeTag.getString("value"));
+        }
+        this.defaultHome = defaultHomeMap;
+
+        // 反序列化黑白名单
+        this.access = PlayerAccess.readFromNBT(nbt.getCompound("access"));
+
+        if (dirty) {
+            this.save();
+        }
+    }
+
+    @Override
+    public void copyFrom(PlayerTeleportData playerData) {
+        if (playerData == null) return;
+
+        this.notified = playerData.isNotified();
+        this.lastCardTime = playerData.getLastCardTime();
+        this.lastTpTime = playerData.getLastTpTime();
+        this.teleportCard.set(playerData.getTeleportCard());
+        this.teleportRecords = playerData.getTeleportRecords();
+        this.homeCoordinate = playerData.getHomeCoordinate();
+        this.defaultHome = playerData.getDefaultHome();
+        this.access = playerData.getAccess();
+
+        this.save();
+    }
+
+    @Override
+    public void save() {
+        if (this.player instanceof ServerPlayer) {
+            PlayerDataManager.instance().put(player, serializeNBT());
+        }
+    }
+
+    public static void clear() {
+        CACHE.clear();
+    }
+
+    // endregion override
+
+
+    private boolean notified;
     private Date lastCardTime;
     private Date lastTpTime;
     private final AtomicInteger teleportCard = new AtomicInteger();
@@ -38,121 +243,112 @@ public class PlayerTeleportData implements IPlayerTeleportData {
      * dimension:name
      */
     private Map<String, String> defaultHome;
-
     /**
-     * 是否已发送使用说明
+     * 玩家自定义的黑白名单
      */
-    private boolean notified;
-    private String language = "client";
+    private PlayerAccess access;
 
-    @Override
+
+    public boolean isNotified() {
+        if (this.isDirty()) this.saveEx();
+        return notified;
+    }
+
+    public void setNotified(boolean notified) {
+        this.notified = notified;
+        this.save();
+    }
+
+    public @NonNull Date getLastCardTime() {
+        if (this.isDirty()) this.saveEx();
+        return this.lastCardTime == null ? this.lastCardTime = DateUtils.getDate(0, 1, 1) : this.lastCardTime;
+    }
+
+    public void setLastCardTime(Date time) {
+        this.lastCardTime = time;
+        this.save();
+    }
+
+    public @NonNull Date getLastTpTime() {
+        if (this.isDirty()) this.saveEx();
+        return this.lastTpTime == null ? this.lastTpTime = DateUtils.getDate(0, 1, 1) : this.lastTpTime;
+    }
+
+    public void setLastTpTime(Date time) {
+        this.lastTpTime = time;
+        this.save();
+    }
+
     public int getTeleportCard() {
+        if (this.isDirty()) this.saveEx();
         return this.teleportCard.get();
     }
 
-    @Override
-    public int plusTeleportCard() {
-        return this.teleportCard.incrementAndGet();
-    }
-
-    @Override
-    public int plusTeleportCard(int num) {
-        return this.teleportCard.addAndGet(num);
-    }
-
-    @Override
-    public int subTeleportCard() {
-        return this.teleportCard.decrementAndGet();
-    }
-
-    @Override
-    public int subTeleportCard(int num) {
-        return this.teleportCard.addAndGet(-num);
-    }
-
-    @Override
     public void setTeleportCard(int num) {
         this.teleportCard.set(num);
+        this.save();
     }
 
-    @Override
-    public @NonNull Date getLastCardTime() {
-        return this.lastCardTime = this.lastCardTime == null ? DateUtils.getDate(0, 1, 1) : this.lastCardTime;
+    public void plusTeleportCard(int num) {
+        this.setTeleportCard(this.getTeleportCard() + num);
     }
 
-    @Override
-    public void setLastCardTime(Date time) {
-        this.lastCardTime = time;
+    public void subTeleportCard(int num) {
+        this.setTeleportCard(this.getTeleportCard() - num);
     }
 
-    @Override
-    public @NonNull Date getLastTpTime() {
-        return this.lastTpTime = this.lastTpTime == null ? DateUtils.getDate(0, 1, 1) : this.lastTpTime;
+    public @NonNull List<TeleportRecord> getTeleportRecords() {
+        if (this.isDirty()) this.saveEx();
+        return this.teleportRecords = CollectionUtils.isNullOrEmpty(this.teleportRecords) ? new ArrayList<>() : this.teleportRecords;
     }
 
-    @Override
-    public void setLastTpTime(Date time) {
-        this.lastTpTime = time;
+    public @NonNull List<TeleportRecord> getTeleportRecords(EnumTeleportType type) {
+        if (this.isDirty()) this.saveEx();
+        return CollectionUtils.isNullOrEmpty(this.teleportRecords) ? this.teleportRecords = new ArrayList<>() :
+                this.teleportRecords.stream().filter(record -> record.getTeleportType() == type).collect(Collectors.toList());
     }
 
-    @Override
-    public @NonNull @NotNull List<TeleportRecord> getTeleportRecords() {
-        return teleportRecords = CollectionUtils.isNullOrEmpty(teleportRecords) ? new ArrayList<>() : teleportRecords;
-    }
-
-    @Override
-    public @NonNull @NotNull List<TeleportRecord> getTeleportRecords(ETeleportType type) {
-        return CollectionUtils.isNullOrEmpty(teleportRecords) ? teleportRecords = new ArrayList<>() :
-                teleportRecords.stream().filter(record -> record.getTeleportType() == type).collect(Collectors.toList());
-    }
-
-    @Override
     public void setTeleportRecords(List<TeleportRecord> records) {
         this.teleportRecords = records;
+        this.save();
     }
 
-    @Override
     public void addTeleportRecords(TeleportRecord... records) {
-        this.getTeleportRecords().addAll(Arrays.asList((records)));
-        this.getTeleportRecords().sort(Comparator.comparing(TeleportRecord::getTeleportTime));
-        int limit = ConfigManager.getConfig().teleportRecordLimit;
-        int size = this.getTeleportRecords().size();
-        if (limit > 0 && limit < size) {
-            this.getTeleportRecords().subList(0, size - limit).clear();
-        }
+        this.teleportRecords.addAll(Arrays.asList(records));
+        Arrays.stream(records).map(TeleportRecord::getTeleportTime).max(Date::compareTo).ifPresent(this::setLastTpTime);
+        this.save();
     }
 
-    @Override
     public Map<KeyValue<String, String>, Coordinate> getHomeCoordinate() {
-        return homeCoordinate = homeCoordinate == null ? new HashMap<>() : homeCoordinate;
+        if (this.isDirty()) this.saveEx();
+        return this.homeCoordinate = this.homeCoordinate == null ? new HashMap<>() : this.homeCoordinate;
     }
 
-    @Override
     public void setHomeCoordinate(Map<KeyValue<String, String>, Coordinate> homeCoordinate) {
         this.homeCoordinate = homeCoordinate;
+        this.save();
     }
 
-    @Override
     public void addHomeCoordinate(KeyValue<String, String> key, Coordinate coordinate) {
         this.getHomeCoordinate().put(key, coordinate);
+        this.save();
     }
 
-    @Override
     public Map<String, String> getDefaultHome() {
-        return defaultHome = defaultHome == null ? new HashMap<>() : defaultHome;
+        if (this.isDirty()) this.saveEx();
+        return this.defaultHome = this.defaultHome == null ? new HashMap<>() : this.defaultHome;
     }
 
-    @Override
     public void setDefaultHome(Map<String, String> defaultHome) {
         this.defaultHome = defaultHome;
+        this.save();
     }
 
-    @Override
     public void addDefaultHome(String key, String value) {
         this.getDefaultHome().put(key, value);
+        this.save();
     }
 
-    @Override
     public KeyValue<String, String> getDefaultHome(String dimension) {
         if (this.getDefaultHome().containsKey(dimension)) {
             return new KeyValue<>(dimension, this.getDefaultHome().get(dimension));
@@ -160,157 +356,26 @@ public class PlayerTeleportData implements IPlayerTeleportData {
         return null;
     }
 
-    public void writeToBuffer(FriendlyByteBuf buffer) {
-        buffer.writeUtf(DateUtils.toDateTimeString(this.getLastCardTime()));
-        buffer.writeUtf(DateUtils.toDateTimeString(this.getLastTpTime()));
-        buffer.writeInt(this.getTeleportCard());
-        buffer.writeInt(this.teleportRecords.size());
-        for (TeleportRecord teleportRecord : this.getTeleportRecords()) {
-            buffer.writeNbt(teleportRecord.writeToNBT());
-        }
-        buffer.writeInt(this.getHomeCoordinate().size());
-        for (Map.Entry<KeyValue<String, String>, Coordinate> entry : this.getHomeCoordinate().entrySet()) {
-            buffer.writeUtf(entry.getKey().getKey());
-            buffer.writeUtf(entry.getKey().getValue());
-            buffer.writeNbt(entry.getValue().writeToNBT());
-        }
-        buffer.writeInt(this.getDefaultHome().size());
-        for (Map.Entry<String, String> entry : this.getDefaultHome().entrySet()) {
-            buffer.writeUtf(entry.getKey());
-            buffer.writeUtf(entry.getValue());
-        }
-        buffer.writeBoolean(this.notified);
-        buffer.writeUtf(this.getLanguage());
+    public PlayerAccess getAccess() {
+        if (this.isDirty()) this.saveEx();
+        return this.access = this.access == null ? new PlayerAccess() : this.access;
     }
 
-    public void readFromBuffer(FriendlyByteBuf buffer) {
-        this.lastCardTime = DateUtils.format(buffer.readUtf());
-        this.lastTpTime = DateUtils.format(buffer.readUtf());
-        this.teleportCard.set(buffer.readInt());
-        this.teleportRecords = new ArrayList<>();
-        for (int i = 0; i < buffer.readInt(); i++) {
-            this.teleportRecords.add(TeleportRecord.readFromNBT(Objects.requireNonNull(buffer.readNbt())));
-        }
-        this.homeCoordinate = new HashMap<>();
-        for (int i = 0; i < buffer.readInt(); i++) {
-            this.homeCoordinate.put(new KeyValue<>(buffer.readUtf(), buffer.readUtf()), Coordinate.readFromNBT(Objects.requireNonNull(buffer.readNbt())));
-        }
-        this.defaultHome = new HashMap<>();
-        for (int i = 0; i < buffer.readInt(); i++) {
-            this.defaultHome.put(buffer.readUtf(), buffer.readUtf());
-        }
-        this.notified = buffer.readBoolean();
-        this.language = buffer.readUtf();
+    public void setAccess(PlayerAccess access) {
+        this.access = access;
+        this.save();
     }
 
-    public void copyFrom(IPlayerTeleportData capability) {
-        this.lastCardTime = capability.getLastCardTime();
-        this.lastTpTime = capability.getLastTpTime();
-        this.teleportCard.set(capability.getTeleportCard());
-        this.teleportRecords = capability.getTeleportRecords();
-        this.homeCoordinate = capability.getHomeCoordinate();
-        this.defaultHome = capability.getDefaultHome();
-        this.notified = capability.isNotified();
-        this.language = capability.getLanguage();
-    }
 
-    @Override
-    public CompoundTag serializeNBT() {
-        CompoundTag tag = new CompoundTag();
-        tag.putString("lastCardTime", DateUtils.toDateTimeString(this.getLastCardTime()));
-        tag.putString("lastTpTime", DateUtils.toDateTimeString(this.getLastTpTime()));
-        tag.putInt("teleportCard", this.getTeleportCard());
-        // 序列化传送记录
-        ListTag recordsNBT = new ListTag();
-        for (TeleportRecord record : this.getTeleportRecords()) {
-            recordsNBT.add(record.writeToNBT());
+    /**
+     * 同步玩家数据到客户端
+     */
+    public static void syncPlayerData(ServerPlayer player) {
+        // 创建自定义包并发送到客户端
+        PlayerDataSyncPacket packet = new PlayerDataSyncPacket(player.getUUID(), getData(player));
+        for (PlayerDataSyncPacket syncPacket : packet.split()) {
+            NarcissusUtils.sendPacketToPlayer(player, ModNetworkHandler.PLAYER_DATA_SYNC, syncPacket);
         }
-        tag.put("teleportRecords", recordsNBT);
-        // 序列化家坐标
-        ListTag homeCoordinateNBT = new ListTag();
-        for (Map.Entry<KeyValue<String, String>, Coordinate> entry : this.getHomeCoordinate().entrySet()) {
-            CompoundTag homeCoordinateTag = new CompoundTag();
-            homeCoordinateTag.putString("key", entry.getKey().getKey());
-            homeCoordinateTag.putString("value", entry.getKey().getValue());
-            homeCoordinateTag.put("coordinate", entry.getValue().writeToNBT());
-            homeCoordinateNBT.add(homeCoordinateTag);
-        }
-        tag.put("homeCoordinate", homeCoordinateNBT);
-        // 序列化默认家
-        ListTag defaultHomeNBT = new ListTag();
-        for (Map.Entry<String, String> entry : this.getDefaultHome().entrySet()) {
-            CompoundTag defaultHomeTag = new CompoundTag();
-            defaultHomeTag.putString("key", entry.getKey());
-            defaultHomeTag.putString("value", entry.getValue());
-            defaultHomeNBT.add(defaultHomeTag);
-        }
-        tag.put("defaultHome", defaultHomeNBT);
-        tag.putBoolean("notified", this.notified);
-        tag.putString("language", this.getLanguage());
-        return tag;
     }
 
-    @Override
-    public void deserializeNBT(CompoundTag nbt) {
-        this.setLastCardTime(DateUtils.format(nbt.getString("lastCardTime")));
-        this.setLastTpTime(DateUtils.format(nbt.getString("lastTpTime")));
-        this.setTeleportCard(nbt.getInt("teleportCard"));
-        // 反序列化传送记录
-        ListTag recordsNBT = nbt.getList("teleportRecords", 10); // 10 是 CompoundTag 的类型ID
-        List<TeleportRecord> records = new ArrayList<>();
-        for (int i = 0; i < recordsNBT.size(); i++) {
-            records.add(TeleportRecord.readFromNBT(recordsNBT.getCompound(i)));
-        }
-        this.setTeleportRecords(records);
-        // 反序列化家坐标
-        ListTag homeCoordinateNBT = nbt.getList("homeCoordinate", 10);
-        Map<KeyValue<String, String>, Coordinate> homeCoordinate = new HashMap<>();
-        for (int i = 0; i < homeCoordinateNBT.size(); i++) {
-            CompoundTag homeCoordinateTag = homeCoordinateNBT.getCompound(i);
-            homeCoordinate.put(new KeyValue<>(homeCoordinateTag.getString("key"), homeCoordinateTag.getString("value")),
-                    Coordinate.readFromNBT(homeCoordinateTag.getCompound("coordinate")));
-        }
-        this.setHomeCoordinate(homeCoordinate);
-        // 反序列化默认家
-        ListTag defaultHomeNBT = nbt.getList("defaultHome", 10);
-        Map<String, String> defaultHome = new HashMap<>();
-        for (int i = 0; i < defaultHomeNBT.size(); i++) {
-            CompoundTag defaultHomeTag = defaultHomeNBT.getCompound(i);
-            defaultHome.put(defaultHomeTag.getString("key"), defaultHomeTag.getString("value"));
-        }
-        this.setDefaultHome(defaultHome);
-        this.notified = nbt.getBoolean("notified");
-        this.setLanguage(nbt.getString("language"));
-    }
-
-    @Override
-    public String getLanguage() {
-        return this.language;
-    }
-
-    @Override
-    public void setLanguage(String language) {
-        this.language = language;
-    }
-
-    @NonNull
-    @Override
-    public String getValidLanguage(@Nullable Player player) {
-        return NarcissusUtils.getValidLanguage(player, this.getLanguage());
-    }
-
-    @Override
-    public boolean isNotified() {
-        return this.notified;
-    }
-
-    @Override
-    public void setNotified(boolean notified) {
-        this.notified = notified;
-    }
-
-    @Override
-    public void save(ServerPlayer player) {
-        PlayerTeleportDataComponent.get(player).copyFrom(this);
-    }
 }

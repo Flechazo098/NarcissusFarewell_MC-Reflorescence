@@ -10,37 +10,23 @@
     "issues": "https://github.com/Flechazo098/NarcissusFarewell_MC-Reflorescence/issues"
   },
   "license": "MIT",
-  "icon": "assets/narcissus_farewell/logo.png",
+  "icon": "assets/narcissus_farewell/icon.png",
   "environment": "*",
   "entrypoints": {
     "client": [
-      "xin.vanilla.narcissus.event.ClientEventHandler"
+      "xin.vanilla.narcissus.NarcissusFarewellClient"
     ],
     "main": [
       "xin.vanilla.narcissus.NarcissusFarewell"
-    ],
-    "cardinal-components": [
-      "xin.vanilla.narcissus.data.player.PlayerComponentInitializer"
-    ],
-    "modmenu": [
-      "xin.vanilla.narcissus.compat.modmenu.ModMenuIntegration"
     ]
   },
-  "custom": {
-    "cardinal-components": [
-      "narcissus_farewell:player_teleport_data"
-    ],
-    "modmenu": {
-      "links": {
-        "curseforge": ""
-      },
-      "badges": [],
-      "update_checker": true
-    }
-  },
+  "mixins": [
+    "narcissus_farewell.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.16.10",
     "fabric": "*",
     "minecraft": "1.20.1"
-  }
+  },
+  "accessWidener" : "narcissus_farewell.accesswidener"
 }

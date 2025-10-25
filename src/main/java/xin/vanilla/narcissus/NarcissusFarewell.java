@@ -1,184 +1,142 @@
 package xin.vanilla.narcissus;
 
+import fuzs.forgeconfigapiport.api.config.v2.ForgeConfigRegistry;
 import lombok.Getter;
-import me.shedaniel.autoconfig.AutoConfig;
-import me.shedaniel.autoconfig.serializer.JanksonConfigSerializer;
+import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.fml.config.ModConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xin.vanilla.narcissus.command.FarewellCommand;
-import xin.vanilla.narcissus.config.ConfigManager;
+import xin.vanilla.narcissus.config.CommonConfig;
+import xin.vanilla.narcissus.config.CustomConfig;
 import xin.vanilla.narcissus.config.ServerConfig;
-import xin.vanilla.narcissus.config.TeleportRequest;
-import xin.vanilla.narcissus.event.ServerEventHandler;
+import xin.vanilla.narcissus.data.SafeBlock;
+import xin.vanilla.narcissus.data.TeleportRequest;
+import xin.vanilla.narcissus.data.player.PlayerDataManager;
+import xin.vanilla.narcissus.data.player.PlayerTeleportData;
+import xin.vanilla.narcissus.event.ServerGameEventHandler;
 import xin.vanilla.narcissus.network.ModNetworkHandler;
 import xin.vanilla.narcissus.network.SplitPacket;
-import xin.vanilla.narcissus.util.NarcissusUtils;
+import xin.vanilla.narcissus.util.LogoModifier;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * NarcissusFarewell 主类
  */
 public class NarcissusFarewell implements ModInitializer {
+
+    public final static String DEFAULT_COMMAND_PREFIX = "narcissus";
+
+    public static final String MODID = "narcissus_farewell";
+    public static final String ARTIFACT_ID = "xin.vanilla";
+
     private static final Logger LOGGER = LogManager.getLogger();
 
-    public static final String MOD_ID = "narcissus_farewell";
-    public static final String DEFAULT_COMMAND_PREFIX = "farewell";
-
     /**
-     * -- GETTER --
-     *  获取服务器实例
-     *
+     * 服务端实例
      */
-    // 服务器实例
     @Getter
     private static MinecraftServer serverInstance;
 
     /**
-     * -- GETTER --
-     *  获取玩家能力组件同步状态
-     *
+     * 分片网络包缓存
      */
-    // 玩家能力组件同步状态
     @Getter
-    private static final Map<String, Boolean> playerCapabilityStatus = new HashMap<>();
+    private static final Map<String, List<? extends SplitPacket>> packetCache = new ConcurrentHashMap<>();
 
     /**
-     * -- GETTER --
-     *  获取传送请求
-     *
+     * 最近一次传送请求
      */
-    // 传送请求 - 修改为使用String作为键
     @Getter
-    private static final Map<String, TeleportRequest> teleportRequest = new HashMap<>();
+    private static final Map<ServerPlayer, ServerPlayer> lastTeleportRequest = new ConcurrentHashMap<>();
 
     /**
-     * -- GETTER --
-     *  获取最近的传送请求
-     *
+     * 待处理的传送请求列表
      */
-    // 最近的传送请求
     @Getter
-    private static final Map<ServerPlayer, ServerPlayer> lastTeleportRequest = new HashMap<>();
+    private static final Map<String, TeleportRequest> teleportRequest = new ConcurrentHashMap<>();
 
-    /**
-     * -- GETTER --
-     *  获取数据包缓存
-     *
-     */
-    // 添加到类的字段部分
     @Getter
-    private static final Map<String, Map<Integer, SplitPacket>> packetCache = new HashMap<>();
-
-    // 添加玩家语言映射
-    @Getter
-    private static final Map<String, String> playerLanguages = new HashMap<>();
-
+    private static final SafeBlock safeBlock = new SafeBlock();
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Initializing NarcissusFarewell...");
+        LOGGER.info("Initializing NarcissusFarewell");
+        ForgeConfigRegistry.INSTANCE.register(MODID, ModConfig.Type.COMMON, CommonConfig.COMMON_CONFIG);
+        ForgeConfigRegistry.INSTANCE.register(MODID, ModConfig.Type.SERVER, ServerConfig.SERVER_CONFIG);
+        ModNetworkHandler.registerPackets();
 
-        // 注册配置
-        registerConfig();
+        ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
+        ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+        ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
 
-        // 注册服务器生命周期事件
-        registerServerLifecycleEvents();
+        ServerGameEventHandler.registerEvents();
+        PlayerDataManager.register();
 
-        // 注册服务器事件
-        ServerEventHandler.registerEvents();
-
-        // 注册命令
-        registerCommands();
-
-        // 注册网络包处理器
-        registerNetworkHandlers();
-
-        LOGGER.info("NarcissusFarewell initialized successfully!");
-    }
-
-    /**
-     * 注册配置
-     */
-    private void registerConfig() {
-        AutoConfig.register(ServerConfig.class, JanksonConfigSerializer::new);
-        ConfigManager.init();
-    }
-
-    private void registerServerLifecycleEvents() {
-        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            serverInstance = server;
-            LOGGER.info("Server starting, instance saved.");
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            LOGGER.debug("Registering commands");
+            FarewellCommand.register(dispatcher);
         });
 
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            serverInstance = null;
-            LOGGER.info("Server stopping, instance cleared.");
+        CustomConfig.loadCustomConfig(false);
 
-            // 清理所有缓存的数据
-            NarcissusUtils.clearCache();
-            if (FarewellCommand.helpMessage != null) {
-                FarewellCommand.helpMessage = null;
-            }
-        });
-    }
-
-
-    /**
-     * 注册命令
-     */
-    private void registerCommands() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> FarewellCommand.register(dispatcher));
-    }
-
-    /**
-     * 注册网络包处理器
-     */
-    private void registerNetworkHandlers() {
-        ModNetworkHandler.registerHandlers();
-    }
-
-    /**
-     * 获取玩家的语言设置
-     *
-     * @param player 玩家
-     * @return 玩家的语言设置，如果未知则返回默认语言
-     */
-    public static String getPlayerLanguage(Player player) {
-        return playerLanguages.getOrDefault(player.getStringUUID(), ConfigManager.getConfig().defaultLanguage);
-    }
-
-    /**
-     * 设置玩家的语言设置
-     *
-     * @param player 玩家
-     * @param language 语言代码
-     */
-    public static void setPlayerLanguage(Player player, String language) {
-        playerLanguages.put(player.getStringUUID(), language);
-    }
-
-    /**
-     * 克隆玩家语言设置
-     *
-     * @param source 源玩家
-     * @param target 目标玩家
-     */
-    public static void clonePlayerLanguage(Player source, Player target) {
-        if (source instanceof ServerPlayer && target instanceof ServerPlayer) {
-            String sourceUUID = source.getStringUUID();
-            String targetUUID = target.getStringUUID();
-
-            if (playerCapabilityStatus.containsKey(sourceUUID)) {
-                playerCapabilityStatus.put(targetUUID, playerCapabilityStatus.get(sourceUUID));
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+            try {
+                FabricLoader.getInstance().getModContainer(MODID).ifPresent(modContainer -> LogoModifier.modifyLogo());
+            } catch (Exception e) {
+                LOGGER.warn("Failed to modify logo", e);
             }
         }
     }
+
+    private void onServerStarting(MinecraftServer server) {
+        serverInstance = server;
+        LOGGER.debug("Server starting");
+    }
+
+    private void onServerStarted(MinecraftServer server) {
+        LOGGER.debug("Server started");
+    }
+
+    private void onServerStopping(MinecraftServer server) {
+        PlayerTeleportData.clear();
+        LOGGER.debug("Server stopping");
+    }
+    // region 资源ID
+
+    public static ResourceLocation emptyResource() {
+        return createResource("", "");
+    }
+
+    public static ResourceLocation createResource(String path) {
+        return createResource(NarcissusFarewell.MODID, path);
+    }
+
+    public static ResourceLocation createResource(String namespace, String path) {
+        return new ResourceLocation(namespace, path);
+    }
+
+    public static ResourceLocation parseResource(String location) {
+        return ResourceLocation.tryParse(location);
+    }
+
+    // endregion 资源ID
+
+
+    // region 外部方法
+    public void reloadCustomConfig() {
+        CustomConfig.loadCustomConfig(false);
+    }
+    // endregion 外部方法
+
 }
